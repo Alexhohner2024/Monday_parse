@@ -65,8 +65,8 @@ export default async function handler(req, res) {
     const endDate = endDateMatch ? endDateMatch[1] : null;
 
     // 7. Марка и модель авто
-    const carModelMatch = fullText.match(/Марка\s+([А-ЯA-Z]+)\s+Модель\s+([\d\-]+)/) ||
-                         fullText.match(/9\.2[^А-ЯA-Z]*([А-ЯA-Z]+)[^0-9]*9\.3[^0-9]*([\d\-]+)/);
+    const carModelMatch = fullText.match(/9\.2\.\s*Марка\s+([А-ЯA-Z]+)\s+9\.3\.\s*Модель\s+([\d\-]+)/) ||
+                         fullText.match(/Марка\s+([А-ЯA-Z]+)[\s\S]*?Модель\s+([\d\-]+)/);
     const carModel = carModelMatch ? `${carModelMatch[1]} ${carModelMatch[2]}`.trim() : null;
 
     // 8. Государственный номер авто
