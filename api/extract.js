@@ -46,16 +46,16 @@ export default async function handler(req, res) {
       }
     }
 
-    // 4. ФИО страхувальника
-    const nameMatch = fullText.match(/Страхувальник[:\s]*([А-ЯЁІЇ][а-яёії']+\s+[А-ЯЁІЇ][а-яёії']+\s+[А-ЯЁІЇ][а-яёії']+)/) ||
-                     fullText.match(/Страхувальник[:\s]*([А-ЯЁІЇ][а-яёії']+[\s,]+[А-ЯЁІЇ][а-яёії']+[\s,]+[А-ЯЁІЇ][а-яёії']+)/);
+    // 4. ФИО страхувальника - в разделе "3. Страхувальник" ищем строку с 3 заглавными словами
+    const nameMatch = fullText.match(/3\.\s*Страхувальник[\s\S]*?([А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+)(?=\s*РНОКПП|\s*\d{10}|\n)/) ||
+                fullText.match(/Найменування\s+([А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+)/);
     const insuredName = nameMatch ? nameMatch[1].trim() : null;
 
     // 5. Дата початку (с временем)
-    const startDateMatch = fullText.match(/Дата початку[:\s]*(\d{2}\.\d{2}\.\d{4})\s*(\d{2}:\d{2})/) ||
-                          fullText.match(/з\s*(\d{2}\.\d{2}\.\d{4})\s*(\d{2}:\d{2})/) ||
-                          fullText.match(/(\d{2}\.\d{2}\.\d{4})\s*(\d{2}:\d{2})/);
-    const startDate = startDateMatch ? `${startDateMatch[1]}, ${startDateMatch[2]}` : null;
+    const startDateMatch = fullText.match(/5\.1[\s\S]*?(\d{2}:\d{2})\s+(\d{2}\.\d{2}\.\d{4})/) ||
+                     fullText.match(/з\s+(\d{2}:\d{2})\s+(\d{2}\.\d{2}\.\d{4})/) ||
+                     fullText.match(/початку[\s\S]*?(\d{2}:\d{2})\s+(\d{2}\.\d{2}\.\d{4})/);
+    const startDate = startDateMatch ? `${startDateMatch[2]}, ${startDateMatch[1]}` : null;
 
     // 6. Дата закінчення - сначала ищем в пункте 5.2, потом везде
     const endDateMatch = fullText.match(/5\.2[^0-9]*(\d{2}\.\d{2}\.\d{4})/) ||
