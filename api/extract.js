@@ -47,14 +47,15 @@ export default async function handler(req, res) {
     }
 
     // 4. ФИО страхувальника
-    // 4. ФИО страхувальника - в разделе "3. Страхувальник" ищем строку с 3 заглавными словами
-    const nameMatch = fullText.match(/3\.\s*Страхувальник[\s\S]*?([А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+)(?=\s|\n)/);
+    const nameMatch = fullText.match(/Страхувальник[:\s]*([А-ЯЁІЇ][а-яёії']+\s+[А-ЯЁІЇ][а-яёії']+\s+[А-ЯЁІЇ][а-яёії']+)/) ||
+                     fullText.match(/Страхувальник[:\s]*([А-ЯЁІЇ][а-яёії']+[\s,]+[А-ЯЁІЇ][а-яёії']+[\s,]+[А-ЯЁІЇ][а-яёії']+)/);
     const insuredName = nameMatch ? nameMatch[1].trim() : null;
 
     // 5. Дата початку (с временем)
-    const startDateMatch = fullText.match(/5\.1[\s\S]*?(\d{2}:\d{2})\s+(\d{2}\.\d{2}\.\d{4})/) ||
-                      fullText.match(/з\s+(\d{2}:\d{2})\s+(\d{2}\.\d{2}\.\d{4})/);
-    const startDate = startDateMatch ? `${startDateMatch[2]}, ${startDateMatch[1]}` : null;
+    const startDateMatch = fullText.match(/Дата початку[:\s]*(\d{2}\.\d{2}\.\d{4})\s*(\d{2}:\d{2})/) ||
+                          fullText.match(/з\s*(\d{2}\.\d{2}\.\d{4})\s*(\d{2}:\d{2})/) ||
+                          fullText.match(/(\d{2}\.\d{2}\.\d{4})\s*(\d{2}:\d{2})/);
+    const startDate = startDateMatch ? `${startDateMatch[1]}, ${startDateMatch[2]}` : null;
 
     // 6. Дата закінчення - сначала ищем в пункте 5.2, потом везде
     const endDateMatch = fullText.match(/5\.2[^0-9]*(\d{2}\.\d{2}\.\d{4})/) ||
@@ -64,8 +65,8 @@ export default async function handler(req, res) {
     const endDate = endDateMatch ? endDateMatch[1] : null;
 
     // 7. Марка и модель авто
-    const carModelMatch = fullText.match(/9\.2\.\s*Марка\s+([А-ЯA-Z]+)\s+9\.3\.\s*Модель\s+([\d\-]+)/) ||
-                         fullText.match(/Марка\s+([А-ЯA-Z]+)[\s\S]*?Модель\s+([\d\-]+)/);
+    const carModelMatch = fullText.match(/9\.2\.\s*Марка\s+([А-ЯA-Z]+)[\s\S]*?9\.3\.\s*Модель\s+([\w\-]+)/) ||
+                         fullText.match(/Марка\s+([А-ЯA-Z]+)[\s\S]*?Модель\s+([\w\-]+)/);
     const carModel = carModelMatch ? `${carModelMatch[1]} ${carModelMatch[2]}`.trim() : null;
 
     // 8. Государственный номер авто
