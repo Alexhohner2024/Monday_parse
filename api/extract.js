@@ -46,10 +46,15 @@ export default async function handler(req, res) {
       }
     }
 
-    // 4. ФИО страхувальника - в разделе "3. Страхувальник" ищем строку с 3 заглавными словами
-    const nameMatch = fullText.match(/3\.\s*Страхувальник[\s\S]*?([А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+)(?=\s*РНОКПП|\s*\d{10}|\n)/) ||
-                fullText.match(/Найменування\s+([А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+)/);
-    const insuredName = nameMatch ? nameMatch[1].trim() : null;
+    // 4. ФИО страхувальника - ТОЛЬКО в разделе "3. Страхувальник"
+    const section3Match = fullText.match(/3\.\s*Страхувальник([\s\S]*?)(?=4\.|$)/);
+    let insuredName = null;
+    if (section3Match) {
+      const section3Text = section3Match[1];
+      const nameMatch = section3Text.match(/Найменування\s+([А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+)/) ||
+                       section3Text.match(/([А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+)(?=\s*РНОКПП|\s*\d{10})/);
+      insuredName = nameMatch ? nameMatch[1].trim() : null;
+    }
 
     // 5. Дата початку (с временем)
     const startDateMatch = fullText.match(/5\.1[\s\S]*?(\d{2}:\d{2})\s+(\d{2}\.\d{2}\.\d{4})/) ||
