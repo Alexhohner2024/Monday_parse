@@ -52,9 +52,10 @@ export default async function handler(req, res) {
     if (section3Match) {
       const section3Text = section3Match[1];
       const nameMatch = section3Text.match(/Найменування\s+([А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+)/) ||
-                       section3Text.match(/([А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+)(?=\s*РНОКПП|\s*\d{10})/);
+                   section3Text.match(/Найменування\s+([А-ЯЁІЇ][а-яёії]+\s+[А-ЯЁІЇ][а-яёії]+\s+[А-ЯЁІЇ][а-яёії]+)/) ||
+                   section3Text.match(/([А-ЯЁІЇ][а-яёії]+\s+[А-ЯЁІЇ][а-яёії]+\s+[А-ЯЁІЇ][а-яёії]+)(?=\s*РНОКПП|\s*\d{10})/);
       insuredName = nameMatch ? nameMatch[1].trim() : null;
-    }
+}
 
     // 5. Дата початку (с временем)
     const startDateMatch = fullText.match(/5\.1[\s\S]*?(\d{2}:\d{2})\s+(\d{2}\.\d{2}\.\d{4})/) ||
