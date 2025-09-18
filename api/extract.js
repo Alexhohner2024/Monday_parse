@@ -76,9 +76,7 @@ export default async function handler(req, res) {
     const carModel = carModelMatch ? `${carModelMatch[1]} ${carModelMatch[2]}`.trim() : null;
 
     // 8. Государственный номер авто
-    const carNumberMatch = fullText.match(/Реєстраційний номер\s+([А-ЯA-Z]{2}\d{4}[А-ЯA-Z]{2})/) ||
-                          fullText.match(/([А-ЯA-Z]{2}\d{4}[А-ЯA-Z]{2})/) ||
-                          fullText.match(/номер[:\s]*([А-ЯA-Z]{2}\d{4}[А-ЯA-Z]{2})/);
+    const carNumberMatch = fullText.match(/Реєстраційний номер\s+([А-ЯA-ZІЇ]{2}\d{4}[А-ЯA-ZІЇ]{2})/);
     const carNumber = carNumberMatch ? carNumberMatch[1] : null;
 
     // Возвращаем результат в формате price|ipn|policy_number (для обратной совместимости)
