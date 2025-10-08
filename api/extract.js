@@ -133,20 +133,20 @@ export default async function handler(req, res) {
       endDate = fallbackDate ? fallbackDate[1] : null;
     }
 
-    // 7. Марка и модель авто
+    // 7. Марка и модель авто - УНИВЕРСАЛЬНЫЙ ПАТТЕРН
     let carModel = null;
-    
-    // Новый формат: "9.2. Марка ... 9.3. Модель"
-    const carModelMatch1 = fullText.match(/9\.2\.\s*Марка\s+([А-ЯA-Z]+)[\s\S]*?9\.3\.\s*Модель\s+([\w\-]+)/) ||
-                          fullText.match(/Марка\s+([А-ЯA-Z]+)[\s\S]*?Модель\s+([\w\-]+)/);
-    
-    // Старый формат: "Марка, модель Volkswagen Transporter"
-    const carModelMatch2 = fullText.match(/Марка,\s*модель\s+([А-ЯA-Za-z]+)\s+([\w\-]+)/);
-    
-    if (carModelMatch1) {
-      carModel = `${carModelMatch1[1]} ${carModelMatch1[2]}`.trim();
-    } else if (carModelMatch2) {
-      carModel = `${carModelMatch2[1]} ${carModelMatch2[2]}`.trim();
+    const carModelMatch = 
+      // Формат: "Марка, модель Mercedes-Benz VITO 110 CDI"
+      fullText.match(/Марка[,:\s]*модель\s*([^\n\r]+)/i)
+      // Формат: "Марка ... Модель ...", оба захватывают любые символы до перевода строки
+      || fullText.match(/Марка[\s\S]{0,40}?([^\n\r]+)[\s\S]{0,40}?Модель[\s\S]{0,40}?([^\n\r]+)/i);
+
+    if (carModelMatch) {
+      if (carModelMatch.length === 3) {
+        carModel = `${carModelMatch[1].trim()} ${carModelMatch[2].trim()}`;
+      } else {
+        carModel = carModelMatch[1].trim();
+      }
     }
 
     // 8. Государственный номер авто
