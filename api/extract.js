@@ -23,21 +23,34 @@ export default async function handler(req, res) {
 
     // 1. Номер полиса - ищем везде, где есть 9 цифр
     const policyMatch = fullText.match(/Поліс\s*№\s*(\d{9})/) || 
-                       fullText.match(/№(\d{9})/) ||
+                       fullText.match(/№\s*(\d{9})/) ||
+                       fullText.match(/Поліс\s+(\d{9})/) ||
                        fullText.match(/(\d{9})/);
     const policyNumber = policyMatch ? policyMatch[1] : null;
 
-    // 2. ИПН - 10 цифр после РНОКПП или ЄДРПОУ
+    // 2. ИПН - 10 цифр после РНОКПП, ЄДРПОУ или ІНПП (для старых полисов)
     const ipnMatch = fullText.match(/РНОКПП[^\d]*(\d{10})/) ||
-                    fullText.match(/ЄДРПОУ[^\d]*(\d{10})/);
+                    fullText.match(/ЄДРПОУ[^\d]*(\d{10})/) ||
+                    fullText.match(/ІНПП[^\d]*(\d{10})/);
     const ipn = ipnMatch ? ipnMatch[1] : null;
 
-    // 3. Цена - ищем в строке "сплачується до або під час укладення Договору"
-    const priceMatch = fullText.match(/Договору\s+(\d)\s+(\d{3}),00/) ||
-                      fullText.match(/Договору\s+(\d{3}),00/) ||
-                      fullText.match(/сплачується[^0-9]*(\d)\s+(\d{3}),00/) ||
-                      fullText.match(/сплачується[^0-9]*(\d{3}),00/);
+    // 3. Цена - ищем в нескольких вариантах
     let price = null;
+    
+    // Новый формат: "сплачується до або під час укладення Договору"
+    const priceMatch1 = fullText.match(/Договору\s+(\d)\s+(\d{3}),00/) ||
+                       fullText.match(/Договору\s+(\d{3}),00/) ||
+                       fullText.match(/сплачується[^0-9]*(\d)\s+(\d{3}),00/) ||
+                       fullText.match(/сплачується[^0-9]*(\d{3}),00/);
+    
+    // Старый формат: "Страховий платіж 1 310 грн. 00 коп."
+    const priceMatch2 = fullText.match(/Страховий\s+платіж[^\d]*(\d)\s+(\d{3})\s+грн/) ||
+                       fullText.match(/Страховий\s+платіж[^\d]*(\d{3})\s+грн/) ||
+                       fullText.match(/платіж[^\d]*(\d)\s+(\d{3})\s+грн/) ||
+                       fullText.match(/платіж[^\d]*(\d{3})\s+грн/);
+    
+    const priceMatch = priceMatch1 || priceMatch2;
+    
     if (priceMatch) {
       if (priceMatch.length === 3) {
         price = priceMatch[1] + priceMatch[2];
@@ -46,38 +59,106 @@ export default async function handler(req, res) {
       }
     }
 
-    // 4. ФИО страхувальника - ТОЛЬКО в разделе "3. Страхувальник"
-    const section3Match = fullText.match(/3\.\s*Страхувальник([\s\S]*?)(?=4\.|$)/);
+    // 4. ФИО страхувальника
     let insuredName = null;
+    
+    // Новый формат: раздел "3. Страхувальник" с "Найменування"
+    const section3Match = fullText.match(/3\.\s*Страхувальник([\s\S]*?)(?=4\.|$)/);
     if (section3Match) {
       const section3Text = section3Match[1];
       const nameMatch = section3Text.match(/Найменування\s+([А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+)/) ||
                    section3Text.match(/Найменування\s+([А-ЯЁІЇ][а-яёії]+\s+[А-ЯЁІЇ][а-яёії]+\s+[А-ЯЁІЇ][а-яёії]+)/) ||
                    section3Text.match(/([А-ЯЁІЇ][а-яёії]+\s+[А-ЯЁІЇ][а-яёії]+\s+[А-ЯЁІЇ][а-яёії]+)(?=\s*РНОКПП|\s*\d{10})/);
       insuredName = nameMatch ? nameMatch[1].trim() : null;
-}
+    }
+    
+    // Старый формат: "Страхувальник" сразу после которого идёт ФИО (БЕЗ "Найменування")
+    if (!insuredName) {
+      const oldNameMatch = fullText.match(/Страхувальник\s+([А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+\s+[А-ЯЁІЇ]+)/) ||
+                          fullText.match(/Страхувальник\s+([А-ЯЁІЇ][а-яёії]+\s+[А-ЯЁІЇ][а-яёії]+\s+[А-ЯЁІЇ][а-яёії]+)/);
+      insuredName = oldNameMatch ? oldNameMatch[1].trim() : null;
+    }
 
-    // 5. Дата початку (с временем)
-    const startDateMatch = fullText.match(/5\.1[\s\S]*?(\d{2}:\d{2})\s+(\d{2}\.\d{2}\.\d{4})/) ||
-                     fullText.match(/з\s+(\d{2}:\d{2})\s+(\d{2}\.\d{2}\.\d{4})/) ||
-                     fullText.match(/початку[\s\S]*?(\d{2}:\d{2})\s+(\d{2}\.\d{2}\.\d{4})/);
-    const startDate = startDateMatch ? `${startDateMatch[2]}, ${startDateMatch[1]}` : null;
+    // 5. Дата початку
+    let startDate = null;
+    
+    // Новый формат: "5.1 ... 00:00 01.01.2024"
+    const startDateMatch1 = fullText.match(/5\.1[\s\S]*?(\d{2}:\d{2})\s+(\d{2}\.\d{2}\.\d{4})/) ||
+                           fullText.match(/з\s+(\d{2}:\d{2})\s+(\d{2}\.\d{2}\.\d{4})/) ||
+                           fullText.match(/початку[\s\S]*?(\d{2}:\d{2})\s+(\d{2}\.\d{2}\.\d{4})/);
+    
+    // Старый формат: "З 00:00 09 жовтня 2024 р."
+    const startDateMatch2 = fullText.match(/З\s+(\d{2}:\d{2})\s+(\d{1,2})\s+(січня|лютого|березня|квітня|травня|червня|липня|серпня|вересня|жовтня|листопада|грудня)\s+(\d{4})\s+р\./);
+    
+    if (startDateMatch1) {
+      startDate = `${startDateMatch1[2]}, ${startDateMatch1[1]}`;
+    } else if (startDateMatch2) {
+      const monthMap = {
+        'січня': '01', 'лютого': '02', 'березня': '03', 'квітня': '04',
+        'травня': '05', 'червня': '06', 'липня': '07', 'серпня': '08',
+        'вересня': '09', 'жовтня': '10', 'листопада': '11', 'грудня': '12'
+      };
+      const day = startDateMatch2[2].padStart(2, '0');
+      const month = monthMap[startDateMatch2[3]];
+      const year = startDateMatch2[4];
+      startDate = `${day}.${month}.${year}, ${startDateMatch2[1]}`;
+    }
 
-    // 6. Дата закінчення - сначала ищем в пункте 5.2, потом везде
-    const endDateMatch = fullText.match(/5\.2[^0-9]*(\d{2}\.\d{2}\.\d{4})/) ||
+    // 6. Дата закінчення
+    let endDate = null;
+    
+    // Новый формат: "5.2 ... 01.01.2025"
+    const endDateMatch1 = fullText.match(/5\.2[^0-9]*(\d{2}\.\d{2}\.\d{4})/) ||
                          fullText.match(/Дата закінчення[:\s]*(\d{2}\.\d{2}\.\d{4})/) ||
-                         fullText.match(/до\s*(\d{2}\.\d{2}\.\d{4})/) ||
-                         fullText.match(/(\d{2}\.\d{2}\.\d{4})/);
-    const endDate = endDateMatch ? endDateMatch[1] : null;
+                         fullText.match(/до\s*(\d{2}\.\d{2}\.\d{4})/);
+    
+    // Старый формат: "по 08 жовтня 2025 р."
+    const endDateMatch2 = fullText.match(/по\s+(\d{1,2})\s+(січня|лютого|березня|квітня|травня|червня|липня|серпня|вересня|жовтня|листопада|грудня)\s+(\d{4})\s+р\./);
+    
+    if (endDateMatch1) {
+      endDate = endDateMatch1[1];
+    } else if (endDateMatch2) {
+      const monthMap = {
+        'січня': '01', 'лютого': '02', 'березня': '03', 'квітня': '04',
+        'травня': '05', 'червня': '06', 'липня': '07', 'серпня': '08',
+        'вересня': '09', 'жовтня': '10', 'листопада': '11', 'грудня': '12'
+      };
+      const day = endDateMatch2[1].padStart(2, '0');
+      const month = monthMap[endDateMatch2[2]];
+      const year = endDateMatch2[3];
+      endDate = `${day}.${month}.${year}`;
+    } else {
+      // Fallback: ищем любую дату
+      const fallbackDate = fullText.match(/(\d{2}\.\d{2}\.\d{4})/);
+      endDate = fallbackDate ? fallbackDate[1] : null;
+    }
 
     // 7. Марка и модель авто
-    const carModelMatch = fullText.match(/9\.2\.\s*Марка\s+([А-ЯA-Z]+)[\s\S]*?9\.3\.\s*Модель\s+([\w\-]+)/) ||
-                         fullText.match(/Марка\s+([А-ЯA-Z]+)[\s\S]*?Модель\s+([\w\-]+)/);
-    const carModel = carModelMatch ? `${carModelMatch[1]} ${carModelMatch[2]}`.trim() : null;
+    let carModel = null;
+    
+    // Новый формат: "9.2. Марка ... 9.3. Модель"
+    const carModelMatch1 = fullText.match(/9\.2\.\s*Марка\s+([А-ЯA-Z]+)[\s\S]*?9\.3\.\s*Модель\s+([\w\-]+)/) ||
+                          fullText.match(/Марка\s+([А-ЯA-Z]+)[\s\S]*?Модель\s+([\w\-]+)/);
+    
+    // Старый формат: "Марка, модель Volkswagen Transporter"
+    const carModelMatch2 = fullText.match(/Марка,\s*модель\s+([А-ЯA-Za-z]+)\s+([\w\-]+)/);
+    
+    if (carModelMatch1) {
+      carModel = `${carModelMatch1[1]} ${carModelMatch1[2]}`.trim();
+    } else if (carModelMatch2) {
+      carModel = `${carModelMatch2[1]} ${carModelMatch2[2]}`.trim();
+    }
 
     // 8. Государственный номер авто
-    const carNumberMatch = fullText.match(/Реєстраційний номер\s+([А-ЯA-ZІЇ]{2}\d{4}[А-ЯA-ZІЇ]{2})/);
-    const carNumber = carNumberMatch ? carNumberMatch[1] : null;
+    let carNumber = null;
+    
+    // Новый формат: "Реєстраційний номер"
+    const carNumberMatch1 = fullText.match(/Реєстраційний номер\s+([А-ЯA-ZІЇ]{2}\d{4}[А-ЯA-ZІЇ]{2})/);
+    
+    // Старый формат: "Номерний знак ВН0637ІХ"
+    const carNumberMatch2 = fullText.match(/Номерний знак\s+([А-ЯA-ZІЇ]{2}\d{4}[А-ЯA-ZІЇ]{2})/);
+    
+    carNumber = carNumberMatch1 ? carNumberMatch1[1] : (carNumberMatch2 ? carNumberMatch2[1] : null);
 
     // Возвращаем результат в формате price|ipn|policy_number (для обратной совместимости)
     const result = `${price || ''}|${ipn || ''}|${policyNumber || ''}`;
