@@ -51,21 +51,21 @@ export default async function handler(req, res) {
       }
     }
 
-    // 4. ФИО страхувальника - ИСПРАВЛЕНО для украинских букв
+    // 4. ФИО страхувальника
     let insuredName = null;
     
     const section3Match = fullText.match(/3\.\s*Страхувальник([\s\S]*?)(?=4\.|$)/);
     if (section3Match) {
       const section3Text = section3Match[1];
-      const nameMatch = section3Text.match(/Найменування\s+([А-ЯЁІЇЄҐ]+\s+[А-ЯЁІЇЄҐ]+\s+[А-ЯЁІЇЄҐ]+)/) ||
-                   section3Text.match(/Найменування\s+([А-ЯЁІЇЄҐ][а-яёіїєґ]+\s+[А-ЯЁІЇЄҐ][а-яёіїєґ]+\s+[А-ЯЁІЇЄҐ][а-яёіїєґ]+)/) ||
-                   section3Text.match(/([А-ЯЁІЇЄҐ][а-яёіїєґ]+\s+[А-ЯЁІЇЄҐ][а-яёіїєґ]+\s+[А-ЯЁІЇЄҐ][а-яёіїєґ]+)(?=\s*РНОКПП|\s*\d{10}|\s*дата)/);
+      const nameMatch = section3Text.match(/Найменування\s+([А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]+)/) ||
+                   section3Text.match(/Найменування\s+([А-ЯЁІЇЄҐЬ][а-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][а-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][а-яёіїєґь]+)/) ||
+                   section3Text.match(/([А-ЯЁІЇЄҐЬ][а-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][а-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][а-яёіїєґь]+)(?=\s*РНОКПП|\s*\d{10}|\s*дата)/);
       insuredName = nameMatch ? nameMatch[1].trim() : null;
     }
     
     if (!insuredName) {
-      const oldNameMatch = fullText.match(/Страхувальник\s+([А-ЯЁІЇЄҐ]+\s+[А-ЯЁІЇЄҐ]+\s+[А-ЯЁІЇЄҐ]+)/) ||
-                          fullText.match(/Страхувальник\s+([А-ЯЁІЇЄҐ][а-яёіїєґ]+\s+[А-ЯЁІЇЄҐ][а-яёіїєґ]+\s+[А-ЯЁІЇЄҐ][а-яёіїєґ]+)/);
+      const oldNameMatch = fullText.match(/Страхувальник\s+([А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]+)/) ||
+                          fullText.match(/Страхувальник\s+([А-ЯЁІЇЄҐЬ][а-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][а-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][а-яёіїєґь]+)/);
       insuredName = oldNameMatch ? oldNameMatch[1].trim() : null;
     }
 
@@ -128,12 +128,21 @@ export default async function handler(req, res) {
       } else {
         carModel = carModelMatch[1].trim();
       }
+      
+      // Очистка от года выпуска и лишней информации
+      if (carModel) {
+        carModel = carModel
+          .replace(/\s+\d+\s+Рік\s+випуску\s+\d{4}/i, '')  // "6 Рік випуску 1990"
+          .replace(/\s+Рік\s+випуску\s+\d{4}/i, '')        // "Рік випуску 1990"
+          .replace(/\s+\d{4}$/i, '')                       // год в конце
+          .replace(/\s+\d+$/, '')                          // цифра в конце "6"
+          .trim();
+      }
     }
 
-    // 8. Государственный номер авто - ИСПРАВЛЕНО для всех форматов
+    // 8. Государственный номер авто
     let carNumber = null;
     
-    // Форматы: AA0000AA, 00000AA, AA0000ОА, 34872ОА
     const carNumberMatch1 = fullText.match(/Реєстраційний номер\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/);
     const carNumberMatch2 = fullText.match(/Номерний знак\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/);
     const carNumberMatch3 = fullText.match(/Номерний знак\s+(\d{5}[А-ЯІЇЄҐA-Z]{2})/);
