@@ -118,8 +118,8 @@ export default async function handler(req, res) {
     let carModel = null;
     
     // Формат 1: Раздел 9 с отдельными полями "9.2. Марка" и "9.3. Модель"
-    const markaMatch = fullText.match(/9\.2\.\s*Марка\s+([A-ZА-ЯІЇЄҐЁ][A-ZА-ЯІЇЄҐЁA-Z\s-]+)/i);
-    const modelMatch = fullText.match(/9\.3\.\s*Модель\s+([A-ZА-ЯІЇЄҐЁ0-9][A-ZА-ЯІЇЄҐЁ0-9\s-]+)/i);
+    const markaMatch = fullText.match(/9\.2\.\s*Марка\s+([A-ZА-ЯІЇЄҐЁ][A-ZА-ЯІЇЄҐЁA-Z\s-]+?)(?=\s*9\.\d+|$)/i);
+    const modelMatch = fullText.match(/9\.3\.\s*Модель\s+([A-ZА-ЯІЇЄҐЁ0-9][A-ZА-ЯІЇЄҐЁ0-9\s-]+?)(?=\s*9\.\d+|$)/i);
     
     if (markaMatch && modelMatch) {
       // Новый формат с разделом 9
