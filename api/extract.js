@@ -1,26 +1,21 @@
 const pdf = require('pdf-parse');
 
 export default async function handler(req, res) {
-  // Разрешаем только POST запросы
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    // Получаем PDF данные из запроса
     const { pdfData } = req.body;
     if (!pdfData) {
       return res.status(400).json({ error: 'PDF data required' });
     }
 
-    // Конвертируем base64 в buffer
     const pdfBuffer = Buffer.from(pdfData, 'base64');
-
-    // Извлекаем текст из PDF
     const data = await pdf(pdfBuffer);
     const fullText = data.text;
 
-    // 1. Номер полиса - ищем везде, где есть 9 цифр
+    // 1. Номер полиса
     const policyMatch =
       fullText.match(/Поліс\s*№\s*(\d{9})/) ||
       fullText.match(/№\s*(\d{9})/) ||
@@ -28,38 +23,32 @@ export default async function handler(req, res) {
       fullText.match(/(\d{9})/);
     const policyNumber = policyMatch ? policyMatch[1] : null;
 
-    // 2. ИПН - 10 цифр после РНОКПП, ЄДРПОУ или ІНПП (для старых полисов)
+    // 2. ИПН
     const ipnMatch =
       fullText.match(/РНОКПП[^\d]*(\d{10})/) ||
       fullText.match(/ЄДРПОУ[^\d]*(\d{10})/) ||
       fullText.match(/ІНПП[:\s]*(\d{10})/);
     const ipn = ipnMatch ? ipnMatch[1] : null;
 
-    // 3. Цена - ищем в нескольких вариантах
+    // 3. Цена
     let price = null;
-
-    // Новый формат: "сплачується до або під час укладення Договору"
     const priceMatch1 =
       fullText.match(/Договору\s+(\d)\s+(\d{3}),00/) ||
       fullText.match(/Договору\s+(\d{3}),00/) ||
       fullText.match(/сплачується[^0-9]*(\d)\s+(\d{3}),00/) ||
       fullText.match(/сплачується[^0-9]*(\d{3}),00/);
-
-    // Старый формат: "Страховий платіж 1 310 грн. 00 коп."
     const priceMatch2 =
       fullText.match(/Страховий\s+платіж[^\d]*(\d)\s+(\d{3})\s+грн/) ||
       fullText.match(/Страховий\s+платіж[^\d]*(\d{3})\s+грн/) ||
       fullText.match(/платіж[^\d]*(\d)\s+(\d{3})\s+грн/) ||
       fullText.match(/платіж[^\d]*(\d{3})\s+грн/);
-
     const priceMatch = priceMatch1 || priceMatch2;
     if (priceMatch) {
       price = priceMatch.length === 3 ? priceMatch[1] + priceMatch[2] : priceMatch[1];
     }
 
-    // 4. ФИО страхувальника — поддержка укр. букв и мягкого знака
+    // 4. ФИО страхувальника
     let insuredName = null;
-
     const section3Match = fullText.match(/3\.\s*Страхувальник([\s\S]*?)(?=4\.|$)/);
     if (section3Match) {
       const section3Text = section3Match[1];
@@ -125,26 +114,37 @@ export default async function handler(req, res) {
       endDate = fallbackDate ? fallbackDate[1] : null;
     }
 
-    // 7. Марка и модель авто
+    // 7. Марка и модель авто - улучшенная логика для разных форматов
     let carModel = null;
-    const carModelMatch =
-      fullText.match(/Марка[,:\s]*модель\s*([^\n\r]+)/i) ||
-      fullText.match(/Марка[\s\S]{0,40}?([^\n\r]+)[\s\S]{0,40}?Модель[\s\S]{0,40}?([^\n\r]+)/i);
+    
+    // Формат 1: Раздел 9 с отдельными полями "9.2. Марка" и "9.3. Модель"
+    const markaMatch = fullText.match(/9\.2\.\s*Марка\s+([A-ZА-ЯІЇЄҐЁ][A-ZА-ЯІЇЄҐЁA-Z\s-]+)/i);
+    const modelMatch = fullText.match(/9\.3\.\s*Модель\s+([A-ZА-ЯІЇЄҐЁ0-9][A-ZА-ЯІЇЄҐЁ0-9\s-]+)/i);
+    
+    if (markaMatch && modelMatch) {
+      // Новый формат с разделом 9
+      carModel = `${markaMatch[1].trim()} ${modelMatch[1].trim()}`;
+    } else {
+      // Формат 2: Старые форматы "Марка, модель"
+      const carModelMatch =
+        fullText.match(/Марка[,:\s]*модель\s*([^\n\r]+)/i) ||
+        fullText.match(/Марка[\s\S]{0,40}?([^\n\r]+)[\s\S]{0,40}?Модель[\s\S]{0,40}?([^\n\r]+)/i);
 
-    if (carModelMatch) {
-      carModel = carModelMatch.length === 3
-        ? `${carModelMatch[1].trim()} ${carModelMatch[2].trim()}`
-        : carModelMatch[1].trim();
+      if (carModelMatch) {
+        carModel = carModelMatch.length === 3
+          ? `${carModelMatch[1].trim()} ${carModelMatch[2].trim()}`
+          : carModelMatch[1].trim();
+      }
+    }
 
-      // Универсальная очистка car_model
+    // Универсальная очистка car_model
+    if (carModel) {
       carModel = carModel
-        // Удаляем префиксы раздела 9 типа "9.8. Потужність (для електромобілів), кВт"
-        .replace(/\d+\.\d+\.\s+[^\n]*?(?=[А-ЯІЇЄҐЁA-Z]{2,})/gi, '')
         // Удаляем "6 Рік випуску 1990"
         .replace(/\s+\d+\s+Рік\s+випуску\s+\d{4}\b/i, '')
         // Удаляем "Рік випуску 1990"
         .replace(/\s+Рік\s+випуску\s+\d{4}\b/i, '')
-        // Удаляем год в конце, если это действительно год выпуска
+        // Удаляем год в конце, если это действительно год выпуска (1950-текущий)
         .replace(/\s+(\d{4})\b$/i, (m, y) => {
           const yr = parseInt(y, 10);
           const now = new Date().getFullYear();
@@ -153,7 +153,7 @@ export default async function handler(req, res) {
         .trim();
     }
 
-    // 8. Государственный номер авто — поддержка форматов 2+4+2 и 5+2
+    // 8. Государственный номер авто
     let carNumber = null;
     const carNumberMatch1 = fullText.match(/Реєстраційний номер\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/);
     const carNumberMatch2 = fullText.match(/Номерний знак\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/);
@@ -166,7 +166,6 @@ export default async function handler(req, res) {
       (carNumberMatch4 && carNumberMatch4[1]) ||
       null;
 
-    // Возвращаем результат в формате price|ipn|policy_number (для обратной совместимости)
     const result = `${price || ''}|${ipn || ''}|${policyNumber || ''}`;
 
     return res.status(200).json({
