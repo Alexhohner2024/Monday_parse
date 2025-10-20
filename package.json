@@ -2,7 +2,7 @@
   "name": "pdf-extractor",
   "version": "1.0.0",
   "engines": {
-    "node": "18.x"
+    "node": "22.x"
   },
   "dependencies": {
     "pdf2pic": "^2.1.4",
