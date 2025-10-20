@@ -1,5 +1,9 @@
 {
   "name": "pdf-extractor",
   "version": "1.0.0",
+  "main": "api/extract.js",
+  "scripts": {
+    "start": "node api/extract.js"
+  },
   "dependencies": {}
 }
