@@ -1,9 +1,8 @@
 {
   "name": "pdf-extractor",
   "version": "1.0.0",
-  "type": "commonjs",
   "engines": {
-    "node": ">=18.x"
+    "node": "18.x"
   },
   "dependencies": {
     "pdf2pic": "^2.1.4",

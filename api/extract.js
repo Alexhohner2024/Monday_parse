@@ -1,6 +1,6 @@
 const pdf = require('pdf-parse');
 
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -154,11 +154,6 @@ module.exports = async function handler(req, res) {
     if (endDateMatch1) {
       endDate = endDateMatch1[1];
     } else if (endDateMatch2) {
-      const monthMap = {
-        'січня': '01', 'лютого': '02', 'березня': '03', 'квітня': '04',
-        'травня': '05', 'червня': '06', 'липня': '07', 'серпня': '08',
-        'вересня': '09', 'жовтня': '10', 'листопада': '11', 'грудня': '12'
-      };
       const day = endDateMatch2[1].padStart(2, '0');
       const month = monthMap[endDateMatch2[2]];
       const year = endDateMatch2[3];
@@ -256,3 +251,5 @@ module.exports = async function handler(req, res) {
     });
   }
 }
+
+module.exports = handler;

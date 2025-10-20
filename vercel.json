@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/extract.js": {
+    "api/extract.cjs": {
       "maxDuration": 30
     }
   }
