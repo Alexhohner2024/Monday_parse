@@ -1,11 +1,12 @@
-import pdf from 'pdf-parse';
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
+    // Dynamic import to avoid pdf-parse loading test files on init
+    const pdf = (await import('pdf-parse')).default;
+    
     const { pdfData } = req.body;
     if (!pdfData) {
       return res.status(400).json({ error: 'PDF data required' });
