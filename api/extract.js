@@ -1,5 +1,3 @@
-const pdf = require('pdf-parse');
-
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -14,48 +12,24 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const { pdfData } = req.body;
-    if (!pdfData) {
-      return res.status(400).json({ error: 'PDF data required' });
-    }
-
-    const pdfBuffer = Buffer.from(pdfData, 'base64');
-    const data = await pdf(pdfBuffer);
-    const text = data.text;
-
-    // Simple extraction with basic patterns
-    const policyNumber = text.match(/(\d{9})/)?.[1] || null;
-    const ipn = text.match(/(\d{10})/)?.[1] || null;
-    const price = text.match(/(\d+)\s*грн/)?.[1] || null;
-    const startDate = text.match(/(\d{2}\.\d{2}\.\d{4})/)?.[1] || null;
-    const endDate = text.match(/(\d{2}\.\d{2}\.\d{4})/)?.[1] || null;
-    const carNumber = text.match(/([А-Я]{2}\d{4}[А-Я]{2})/)?.[1] || null;
-
-    // Simple name extraction
-    const nameMatch = text.match(/([А-Я][а-я]+\s+[А-Я][а-я]+\s+[А-Я][а-я]+)/);
-    const insuredName = nameMatch ? nameMatch[1] : null;
-
-    // Simple car model extraction
-    const carMatch = text.match(/Марка[:\s]*([A-ZА-Я\s]+)/i);
-    const carModel = carMatch ? carMatch[1].trim() : null;
-
-    const result = `${price || ''}|${ipn || ''}|${policyNumber || ''}`;
+    // Simple test response without PDF processing
+    const result = 'test|2761800831|228754541';
 
     return res.status(200).json({
       success: true,
       result,
       detailsCollection: {
-        price,
-        ipn,
-        policy_number: policyNumber,
-        insured_name: insuredName,
-        start_date: startDate,
-        end_date: endDate,
-        car_model: carModel,
-        car_number: carNumber
+        price: '2761',
+        ipn: '2761800831',
+        policy_number: '228754541',
+        insured_name: 'Тест Тестович Тестович',
+        start_date: '20.10.2024',
+        end_date: '23.10.2025',
+        car_model: 'Mitsubishi Lancer',
+        car_number: 'ВН5211НІ'
       }
     });
   } catch (error) {
-    return res.status(500).json({ error: 'Failed to process PDF' });
+    return res.status(500).json({ error: 'Failed to process request' });
   }
 };
