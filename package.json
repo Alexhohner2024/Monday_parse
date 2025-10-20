@@ -1,8 +1,8 @@
 {
   "name": "pdf-extractor",
   "version": "1.0.0",
-  "type": "module",
   "dependencies": {
+    "pdf2pic": "^2.1.4",
     "pdf-parse": "^1.1.1"
   }
 }

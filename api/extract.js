@@ -1,12 +1,11 @@
+const pdf = require('pdf-parse');
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    // Dynamic import to avoid pdf-parse loading test files on init
-    const pdf = (await import('pdf-parse')).default;
-    
     const { pdfData } = req.body;
     if (!pdfData) {
       return res.status(400).json({ error: 'PDF data required' });
@@ -115,15 +114,18 @@ export default async function handler(req, res) {
       endDate = fallbackDate ? fallbackDate[1] : null;
     }
 
-    // 7. Марка и модель авто
+    // 7. Марка и модель авто - улучшенная логика для разных форматов
     let carModel = null;
     
+    // Формат 1: Раздел 9 с отдельными полями "9.2. Марка" и "9.3. Модель"
     const markaMatch = fullText.match(/9\.2\.\s*Марка\s+([A-ZА-ЯІЇЄҐЁ][A-ZА-ЯІЇЄҐЁA-Z\s-]+?)(?=\s*9\.\d+|$)/i);
     const modelMatch = fullText.match(/9\.3\.\s*Модель\s+([A-ZА-ЯІЇЄҐЁ0-9][A-ZА-ЯІЇЄҐЁ0-9\s-]+?)(?=\s*9\.\d+|$)/i);
     
     if (markaMatch && modelMatch) {
+      // Новый формат с разделом 9
       carModel = `${markaMatch[1].trim()} ${modelMatch[1].trim()}`;
     } else {
+      // Формат 2: Старые форматы "Марка, модель"
       const carModelMatch =
         fullText.match(/Марка[,:\s]*модель\s*([^\n\r]+)/i) ||
         fullText.match(/Марка[\s\S]{0,40}?([^\n\r]+)[\s\S]{0,40}?Модель[\s\S]{0,40}?([^\n\r]+)/i);
@@ -135,10 +137,14 @@ export default async function handler(req, res) {
       }
     }
 
+    // Универсальная очистка car_model
     if (carModel) {
       carModel = carModel
+        // Удаляем "6 Рік випуску 1990"
         .replace(/\s+\d+\s+Рік\s+випуску\s+\d{4}\b/i, '')
+        // Удаляем "Рік випуску 1990"
         .replace(/\s+Рік\s+випуску\s+\d{4}\b/i, '')
+        // Удаляем год в конце, если это действительно год выпуска (1950-текущий)
         .replace(/\s+(\d{4})\b$/i, (m, y) => {
           const yr = parseInt(y, 10);
           const now = new Date().getFullYear();
@@ -165,7 +171,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       result: result,
-      detailsCollection: {
+      details: {
         price: price,
         ipn: ipn,
         policy_number: policyNumber,
