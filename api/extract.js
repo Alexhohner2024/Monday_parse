@@ -23,15 +23,21 @@ module.exports = async (req, res) => {
     const data = await pdf(pdfBuffer);
     const text = data.text;
 
-    // Simple extraction
+    // Simple extraction with basic patterns
     const policyNumber = text.match(/(\d{9})/)?.[1] || null;
     const ipn = text.match(/(\d{10})/)?.[1] || null;
-    const price = text.match(/(\d{1,6})\s*грн/)?.[1] || null;
-    const insuredName = text.match(/([А-ЯЁІЇЄҐЬ][а-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][а-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][а-яёіїєґь]+)/)?.[1] || null;
+    const price = text.match(/(\d+)\s*грн/)?.[1] || null;
     const startDate = text.match(/(\d{2}\.\d{2}\.\d{4})/)?.[1] || null;
     const endDate = text.match(/(\d{2}\.\d{2}\.\d{4})/)?.[1] || null;
-    const carModel = text.match(/Марка[\s\S]*?([A-ZА-ЯІЇЄҐЁ][A-ZА-ЯІЇЄҐЁ0-9\s-]+)/i)?.[1]?.trim() || null;
-    const carNumber = text.match(/([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/)?.[1] || null;
+    const carNumber = text.match(/([А-Я]{2}\d{4}[А-Я]{2})/)?.[1] || null;
+
+    // Simple name extraction
+    const nameMatch = text.match(/([А-Я][а-я]+\s+[А-Я][а-я]+\s+[А-Я][а-я]+)/);
+    const insuredName = nameMatch ? nameMatch[1] : null;
+
+    // Simple car model extraction
+    const carMatch = text.match(/Марка[:\s]*([A-ZА-Я\s]+)/i);
+    const carModel = carMatch ? carMatch[1].trim() : null;
 
     const result = `${price || ''}|${ipn || ''}|${policyNumber || ''}`;
 
@@ -50,7 +56,6 @@ module.exports = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error:', error.message);
     return res.status(500).json({ error: 'Failed to process PDF' });
   }
 };
