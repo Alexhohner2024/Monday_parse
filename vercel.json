@@ -1,9 +1,7 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/extract.js",
-      "use": "@vercel/node"
+  "functions": {
+    "api/extract.js": {
+      "maxDuration": 30
     }
-  ]
+  }
 }

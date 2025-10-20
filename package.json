@@ -1,9 +1,12 @@
 {
   "name": "pdf-extractor",
   "version": "1.0.0",
-  "main": "api/extract.js",
-  "scripts": {
-    "start": "node api/extract.js"
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18.x"
   },
-  "dependencies": {}
+  "dependencies": {
+    "pdf2pic": "^2.1.4",
+    "pdf-parse": "^1.1.1"
+  }
 }
