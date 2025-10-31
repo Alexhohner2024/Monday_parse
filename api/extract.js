@@ -118,7 +118,7 @@ export default async function handler(req, res) {
     let carModel = null;
     
     // Формат 1: Раздел 9 с отдельными полями "9.2. Марка" и "9.3. Модель"
-    const markaMatch = fullText.match(/9\.2\.\s*Марка\s+([A-ZА-ЯІЇЄҐЁ][A-ZА-ЯІЇЄҐЁA-Z\s-]+?)(?=\s*9\.\d+|$)/i);
+    const markaMatch = fullText.match(/9\.2\.\s*Марка\s+([A-ZА-ЯІЇЄҐЁ][A-ZА-ЯІЇЄҐЁA-Z0-9\s-]+?)(?=\s*9\.\d+|$)/i);
     const modelMatch = fullText.match(/9\.3\.\s*Модель\s+([A-ZА-ЯІЇЄҐЁ0-9][A-ZА-ЯІЇЄҐЁ0-9\s-]+?)(?=\s*9\.\d+|$)/i);
     
     if (markaMatch && modelMatch) {
@@ -127,6 +127,7 @@ export default async function handler(req, res) {
     } else {
       // Формат 2: Старые форматы "Марка, модель"
       const carModelMatch =
+        fullText.match(/Марка[,:\s]*модель\s+([А-ЯA-Z0-9][А-ЯA-Z0-9\s-]+?)(?=\s+Рік)/i) ||
         fullText.match(/Марка[,:\s]*модель\s*([^\n\r]+)/i) ||
         fullText.match(/Марка[\s\S]{0,40}?([^\n\r]+)[\s\S]{0,40}?Модель[\s\S]{0,40}?([^\n\r]+)/i);
 
