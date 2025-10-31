@@ -127,6 +127,7 @@ export default async function handler(req, res) {
     } else {
       // Формат 2: Старые форматы "Марка, модель"
       const carModelMatch =
+        fullText.match(/Марка[,:\s]*модель\s+([А-ЯA-Z0-9][А-ЯA-Z0-9\s-]+?)(?=\s+Рік)/i) ||
         fullText.match(/Марка[,:\s]*модель\s*([^\n\r]+)/i) ||
         fullText.match(/Марка[\s\S]{0,40}?([^\n\r]+)[\s\S]{0,40}?Модель[\s\S]{0,40}?([^\n\r]+)/i);
 
