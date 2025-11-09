@@ -255,11 +255,25 @@ export default async function handler(req, res) {
 
     // Старий формат або якщо табличний не спрацював
     if (!vinNumber) {
-      const vinMatch =
-        fullText.match(/VIN[^\n]*([A-Z0-9]{17})/i) ||
-        fullText.match(/Номер кузова[^\n]*([A-Z0-9]{17})/i) ||
-        fullText.match(/([A-Z0-9]{17})/);
-      vinNumber = vinMatch ? vinMatch[1] : null;
+      // Спочатку шукаємо VIN секцію і видаляємо всі пробіли/переноси для правильного парсингу
+      const vinSectionMatch = fullText.match(/VIN[^A-Z0-9]{0,100}([A-Z0-9\s\n\r]{17,25})/i);
+      if (vinSectionMatch) {
+        // Видаляємо всі пробіли та переноси, залишаємо тільки букви та цифри
+        const cleanedVin = vinSectionMatch[1].replace(/[\s\n\r]/g, '');
+        // Беремо перші 17 символів
+        if (cleanedVin.length >= 17) {
+          vinNumber = cleanedVin.substring(0, 17);
+        }
+      }
+
+      // Запасні варіанти
+      if (!vinNumber) {
+        const vinMatch =
+          fullText.match(/VIN[^\n]*([A-Z0-9]{17})/i) ||
+          fullText.match(/Номер кузова[^\n]*([A-Z0-9]{17})/i) ||
+          fullText.match(/([A-Z0-9]{17})/);
+        vinNumber = vinMatch ? vinMatch[1] : null;
+      }
     }
 
     const result = `${price || ''}|${ipn || ''}|${policyNumber || ''}`;
