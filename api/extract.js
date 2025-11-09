@@ -97,6 +97,11 @@ export default async function handler(req, res) {
     const startDateMatch2 = fullText.match(
       /З\s+(\d{2}:\d{2})\s+(\d{1,2})\s+(січня|лютого|березня|квітня|травня|червня|липня|серпня|вересня|жовтня|листопада|грудня)\s+(\d{4})\s+р\./
     );
+    // Новий формат заяви-приєднання: "з 00:00 год. 13 листопада 2024 р."
+    const startDateMatch3 = fullText.match(
+      /з\s+(\d{2}:\d{2})\s+год\.\s+(\d{1,2})\s+(січня|лютого|березня|квітня|травня|червня|липня|серпня|вересня|жовтня|листопада|грудня)\s+(\d{4})\s+р\./i
+    );
+
     if (startDateMatch1) {
       startDate = `${startDateMatch1[2]}, ${startDateMatch1[1]}`;
     } else if (startDateMatch2) {
@@ -109,6 +114,16 @@ export default async function handler(req, res) {
       const month = monthMap[startDateMatch2[3]];
       const year = startDateMatch2[4];
       startDate = `${day}.${month}.${year}, ${startDateMatch2[1]}`;
+    } else if (startDateMatch3) {
+      const monthMap = {
+        'січня': '01', 'лютого': '02', 'березня': '03', 'квітня': '04',
+        'травня': '05', 'червня': '06', 'липня': '07', 'серпня': '08',
+        'вересня': '09', 'жовтня': '10', 'листопада': '11', 'грудня': '12'
+      };
+      const day = startDateMatch3[2].padStart(2, '0');
+      const month = monthMap[startDateMatch3[3]];
+      const year = startDateMatch3[4];
+      startDate = `${day}.${month}.${year}, ${startDateMatch3[1]}`;
     }
 
     // 6. Дата закінчення
