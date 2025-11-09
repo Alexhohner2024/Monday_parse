@@ -255,11 +255,29 @@ export default async function handler(req, res) {
 
     // Старий формат або якщо табличний не спрацював
     if (!vinNumber) {
-      const vinMatch =
-        fullText.match(/VIN[^\n]*([A-Z0-9]{17})/i) ||
-        fullText.match(/Номер кузова[^\n]*([A-Z0-9]{17})/i) ||
-        fullText.match(/([A-Z0-9]{17})/);
-      vinNumber = vinMatch ? vinMatch[1] : null;
+      // Шукаємо VIN секцію і витягуємо номер (VIN може бути різної довжини: 11-17 символів)
+      // Патерн захоплює більше символів, щоб врахувати переноси строк
+      const vinSectionMatch = fullText.match(/VIN[^A-Z0-9]{0,100}([A-Z0-9\s\n\r]{6,30})/i);
+      if (vinSectionMatch) {
+        // Видаляємо всі пробіли та переноси, залишаємо тільки букви та цифри
+        const cleanedVin = vinSectionMatch[1].replace(/[\s\n\r]/g, '');
+        // VIN зазвичай від 11 до 17 символів, але може бути і коротше (старі авто, причепи)
+        // Беремо найдовший відрізок буквено-цифрових символів довжиною від 6 до 17
+        const vinMatch = cleanedVin.match(/^[A-Z0-9]{6,17}/);
+        if (vinMatch) {
+          vinNumber = vinMatch[0];
+        }
+      }
+
+      // Запасні варіанти для різних форматів
+      if (!vinNumber) {
+        const vinMatch =
+          fullText.match(/VIN[^\n]*([A-Z0-9]{11,17})/i) ||
+          fullText.match(/Номер кузова[^\n]*([A-Z0-9]{11,17})/i) ||
+          fullText.match(/VIN[:\s]*([A-Z0-9]{11,17})/i) ||
+          fullText.match(/([A-Z0-9]{17})/); // Стандартний 17-символьний VIN
+        vinNumber = vinMatch ? vinMatch[1] : null;
+      }
     }
 
     const result = `${price || ''}|${ipn || ''}|${policyNumber || ''}`;
