@@ -2,7 +2,7 @@
   "name": "pdf-extractor",
   "version": "1.0.0",
   "dependencies": {
-    "pdf2pic": "^2.1.4",
-    "pdf-parse": "^1.1.1"
+    "pdf-parse": "^1.1.4",
+    "pdf2pic": "^2.1.4"
   }
 }
