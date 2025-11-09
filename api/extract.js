@@ -156,9 +156,9 @@ export default async function handler(req, res) {
     let carModel = null;
 
     // Формат 1: Новий формат заяви-приєднання "4.1. Марка, модель" (табличний формат)
-    // Заголовки: "4.1. Марка, модель 4.2. Реєстраційний номер..."
-    // Дані: "Nissan, Maxima ВН2544ОО..."
-    const tableMatch = fullText.match(/4\.1\.\s*Марка[,:\s]*модель[^\n]*\n\s*([A-ZА-ЯІЇЄҐЁ][A-ZА-ЯІЇЄҐЁA-Z0-9,\s-]+?)\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})\s/i);
+    // Заголовки: "4.1. Марка, модель 4.2. Реєстраційний номер 4.3. Номер кузова..."
+    // Дані: "Nissan, Maxima ВН2544ОО 1N4AA6AP5HC382929..."
+    const tableMatch = fullText.match(/4\.1\.\s*Марка[,:\s]*модель[^\n]*\n\s*([A-ZА-ЯІЇЄҐЁ][A-ZА-ЯІЇЄҐЁA-Z0-9,\s-]+?)\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})\s+([A-Z0-9]{17})\s/i);
     if (tableMatch) {
       carModel = tableMatch[1].trim().replace(/,\s*/g, ' ');  // Замінюємо коми на пробіли
     }
@@ -230,6 +230,23 @@ export default async function handler(req, res) {
         null;
     }
 
+    // 9. VIN номер
+    let vinNumber = null;
+
+    // Новий формат: табличний (витягуємо з того ж match що і car_model)
+    if (tableMatch && tableMatch[3]) {
+      vinNumber = tableMatch[3].trim();
+    }
+
+    // Старий формат або якщо табличний не спрацював
+    if (!vinNumber) {
+      const vinMatch =
+        fullText.match(/VIN[^\n]*([A-Z0-9]{17})/i) ||
+        fullText.match(/Номер кузова[^\n]*([A-Z0-9]{17})/i) ||
+        fullText.match(/([A-Z0-9]{17})/);
+      vinNumber = vinMatch ? vinMatch[1] : null;
+    }
+
     const result = `${price || ''}|${ipn || ''}|${policyNumber || ''}`;
 
     return res.status(200).json({
@@ -243,7 +260,8 @@ export default async function handler(req, res) {
         start_date: startDate,
         end_date: endDate,
         car_model: carModel,
-        car_number: carNumber
+        car_number: carNumber,
+        vin_number: vinNumber
       }
     });
   } catch (error) {
