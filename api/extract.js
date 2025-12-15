@@ -42,53 +42,42 @@ export default async function handler(req, res) {
 
     // Старі формати
     if (!price) {
-      const priceMatch1 =
-        fullText.match(/Договору\s+(\d)\s+(\d{3}),00/) ||
-        fullText.match(/Договору\s+(\d{3}),00/) ||
-        fullText.match(/сплачується[^0-9]*(\d)\s+(\d{3}),00/) ||
-        fullText.match(/сплачується[^0-9]*(\d{3}),00/);
-      const priceMatch2 =
-        fullText.match(/Страховий\s+платіж[^\d]*(\d)\s+(\d{3})\s+грн/) ||
-        fullText.match(/Страховий\s+платіж[^\d]*(\d{3})\s+грн/) ||
-        fullText.match(/платіж[^\d]*(\d)\s+(\d{3})\s+грн/) ||
-        fullText.match(/платіж[^\d]*(\d{3})\s+грн/);
-      const priceMatch = priceMatch1 || priceMatch2;
-      if (priceMatch) {
-        price = priceMatch.length === 3 ? priceMatch[1] + priceMatch[2] : priceMatch[1];
+    const priceMatch1 =
+      fullText.match(/Договору\s+(\d)\s+(\d{3}),00/) ||
+      fullText.match(/Договору\s+(\d{3}),00/) ||
+      fullText.match(/сплачується[^0-9]*(\d)\s+(\d{3}),00/) ||
+      fullText.match(/сплачується[^0-9]*(\d{3}),00/);
+    const priceMatch2 =
+      fullText.match(/Страховий\s+платіж[^\d]*(\d)\s+(\d{3})\s+грн/) ||
+      fullText.match(/Страховий\s+платіж[^\d]*(\d{3})\s+грн/) ||
+      fullText.match(/платіж[^\d]*(\d)\s+(\d{3})\s+грн/) ||
+      fullText.match(/платіж[^\d]*(\d{3})\s+грн/);
+    const priceMatch = priceMatch1 || priceMatch2;
+    if (priceMatch) {
+      price = priceMatch.length === 3 ? priceMatch[1] + priceMatch[2] : priceMatch[1];
       }
     }
 
     // 4. ФИО страхувальника
     let insuredName = null;
-<<<<<<< HEAD
-    const section3Match = fullText.match(/3\.\s*Страхувальник([\s\S]*?)(?=4\.|$)/);
-    if (section3Match) {
-      const section3Text = section3Match[1];
-      const nameMatch =
-        // Полностью заглавными: МАНЧУК ІВАН МИХАЙЛОВИЧ
-        section3Text.match(/Найменування\s+([А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]+)/) ||
-        // Смешанный регистр: Манчук ІВАН Михайлович или Манчук Іван Михайлович
-        section3Text.match(/Найменування\s+([А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+)/) ||
-        // Стандартный формат: Манчук Іван Михайлович
-        section3Text.match(/([А-ЯЁІЇЄҐЬ][а-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][а-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][а-яёіїєґь]+)(?=\s*РНОКПП|\s*\d{10}|\s*дата)/);
-      insuredName = nameMatch ? nameMatch[1].trim() : null;
-=======
 
-    // Новий формат: "1. СТРАХУВАЛЬНИК" з ПІБ на наступному рядку
-    const newFormatMatch = fullText.match(/1\.\s*СТРАХУВАЛЬНИК[^\n]*\n[^\n]*\n\s*([А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]+)/i);
+    // Новий формат: "1. СТРАХУВАЛЬНИК" з ПІБ на наступному рядку (підтримка змішаного регістру)
+    const newFormatMatch = fullText.match(/1\.\s*СТРАХУВАЛЬНИК[^\n]*\n[^\n]*\n\s*([А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+)/i);
     if (newFormatMatch) {
       insuredName = newFormatMatch[1].trim();
->>>>>>> 9efa1443c5410f8c97c4fa099a2e1e4506498348
     }
 
-    // Старий формат: секція 3. Страхувальник
+    // Старий формат: секція 3. Страхувальник (підтримка змішаного регістру)
     if (!insuredName) {
       const section3Match = fullText.match(/3\.\s*Страхувальник([\s\S]*?)(?=4\.|$)/);
       if (section3Match) {
         const section3Text = section3Match[1];
         const nameMatch =
+          // Полностью заглавными: МАНЧУК ІВАН МИХАЙЛОВИЧ
           section3Text.match(/Найменування\s+([А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]+)/) ||
-          section3Text.match(/Найменування\s+([А-ЯЁІЇЄҐЬ][а-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][а-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][а-яёіїєґь]+)/) ||
+          // Смешанный регистр: Манчук ІВАН Михайлович или Манчук Іван Михайлович
+          section3Text.match(/Найменування\s+([А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+)/) ||
+          // Стандартный формат: Манчук Іван Михайлович
           section3Text.match(/([А-ЯЁІЇЄҐЬ][а-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][а-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][а-яёіїєґь]+)(?=\s*РНОКПП|\s*\d{10}|\s*дата)/);
         insuredName = nameMatch ? nameMatch[1].trim() : null;
       }
@@ -166,7 +155,7 @@ export default async function handler(req, res) {
         const year = endDateMatch1[3];
         endDate = `${day}.${month}.${year}`;
       } else {
-        endDate = endDateMatch1[1];
+      endDate = endDateMatch1[1];
       }
     } else if (endDateMatch2) {
       const monthMap = {
@@ -185,7 +174,7 @@ export default async function handler(req, res) {
 
     // 7. Марка и модель авто - улучшенная логика для разных форматов
     let carModel = null;
-
+    
     // Формат 1: Новий формат заяви-приєднання "4.1. Марка, модель" (табличний формат)
     // Заголовки: "4.1. Марка, модель 4.2. Реєстраційний номер 4.3. Номер кузова..."
     // Дані: "Nissan, Maxima ВН2544ОО 1N4AA6AP5HC382929..."
@@ -196,11 +185,11 @@ export default async function handler(req, res) {
 
     // Формат 2: Раздел 9 с отдельными полями "9.2. Марка" и "9.3. Модель"
     if (!carModel) {
-      const markaMatch = fullText.match(/9\.2\.\s*Марка\s+([A-ZА-ЯІЇЄҐЁ][A-ZА-ЯІЇЄҐЁA-Z0-9\s-]+?)(?=\s*9\.\d+|$)/i);
-      const modelMatch = fullText.match(/9\.3\.\s*Модель\s+([A-ZА-ЯІЇЄҐЁ0-9][A-ZА-ЯІЇЄҐЁ0-9\s-]+?)(?=\s*9\.\d+|$)/i);
-
-      if (markaMatch && modelMatch) {
-        carModel = `${markaMatch[1].trim()} ${modelMatch[1].trim()}`;
+    const markaMatch = fullText.match(/9\.2\.\s*Марка\s+([A-ZА-ЯІЇЄҐЁ][A-ZА-ЯІЇЄҐЁA-Z0-9\s-]+?)(?=\s*9\.\d+|$)/i);
+    const modelMatch = fullText.match(/9\.3\.\s*Модель\s+([A-ZА-ЯІЇЄҐЁ0-9][A-ZА-ЯІЇЄҐЁ0-9\s-]+?)(?=\s*9\.\d+|$)/i);
+    
+    if (markaMatch && modelMatch) {
+      carModel = `${markaMatch[1].trim()} ${modelMatch[1].trim()}`;
       }
     }
 
@@ -246,19 +235,19 @@ export default async function handler(req, res) {
     if (!carNumber) {
       const newCarNumberMatch = fullText.match(/4\.2\.\s*Реєстраційний номер\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/i);
       const newCarNumberMatch2 = fullText.match(/4\.2\.\s*Реєстраційний номер\s+(\d{5}[А-ЯІЇЄҐA-Z]{2})/i);
-      const carNumberMatch1 = fullText.match(/Реєстраційний номер\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/);
-      const carNumberMatch2 = fullText.match(/Номерний знак\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/);
-      const carNumberMatch3 = fullText.match(/Номерний знак\s+(\d{5}[А-ЯІЇЄҐA-Z]{2})/);
-      const carNumberMatch4 = fullText.match(/Реєстраційний номер\s+(\d{5}[А-ЯІЇЄҐA-Z]{2})/);
+    const carNumberMatch1 = fullText.match(/Реєстраційний номер\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/);
+    const carNumberMatch2 = fullText.match(/Номерний знак\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/);
+    const carNumberMatch3 = fullText.match(/Номерний знак\s+(\d{5}[А-ЯІЇЄҐA-Z]{2})/);
+    const carNumberMatch4 = fullText.match(/Реєстраційний номер\s+(\d{5}[А-ЯІЇЄҐA-Z]{2})/);
 
-      carNumber =
+    carNumber =
         (newCarNumberMatch && newCarNumberMatch[1]) ||
         (newCarNumberMatch2 && newCarNumberMatch2[1]) ||
-        (carNumberMatch1 && carNumberMatch1[1]) ||
-        (carNumberMatch2 && carNumberMatch2[1]) ||
-        (carNumberMatch3 && carNumberMatch3[1]) ||
-        (carNumberMatch4 && carNumberMatch4[1]) ||
-        null;
+      (carNumberMatch1 && carNumberMatch1[1]) ||
+      (carNumberMatch2 && carNumberMatch2[1]) ||
+      (carNumberMatch3 && carNumberMatch3[1]) ||
+      (carNumberMatch4 && carNumberMatch4[1]) ||
+      null;
     }
 
     // 9. VIN номер
