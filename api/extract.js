@@ -177,8 +177,8 @@ export default async function handler(req, res) {
     
     // Формат 1: Новий формат заяви-приєднання "4.1. Марка, модель" (табличний формат)
     // Заголовки: "4.1. Марка, модель 4.2. Реєстраційний номер 4.3. Номер кузова..."
-    // Дані: "Nissan, Maxima ВН2544ОО 1N4AA6AP5HC382929..."
-    const tableMatch = fullText.match(/4\.1\.\s*Марка[,:\s]*модель[^\n]*\n\s*([A-ZА-ЯІЇЄҐЁ][A-ZА-ЯІЇЄҐЁA-Z0-9,\s-]+?)\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})\s+([A-Z0-9]{17})\s/i);
+    // Дані: "Nissan, Maxima ВН2544ОО 1N4AA6AP5HC382929..." или "Nissan, Maxima 0985ОЭ 1N4AA6AP5HC382929..."
+    const tableMatch = fullText.match(/4\.1\.\s*Марка[,:\s]*модель[^\n]*\n\s*([A-ZА-ЯІЇЄҐЁ][A-ZА-ЯІЇЄҐЁA-Z0-9,\s-]+?)\s+((?:[А-ЯІЇЄҐA-Z]{2})?\d{4}[А-ЯІЇЄҐA-Z]{2})\s+([A-Z0-9]{17})\s/i);
     if (tableMatch) {
       carModel = tableMatch[1].trim().replace(/,\s*/g, ' ');  // Замінюємо коми на пробіли
     }
@@ -235,18 +235,24 @@ export default async function handler(req, res) {
     if (!carNumber) {
       const newCarNumberMatch = fullText.match(/4\.2\.\s*Реєстраційний номер\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/i);
       const newCarNumberMatch2 = fullText.match(/4\.2\.\s*Реєстраційний номер\s+(\d{5}[А-ЯІЇЄҐA-Z]{2})/i);
-    const carNumberMatch1 = fullText.match(/Реєстраційний номер\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/);
-    const carNumberMatch2 = fullText.match(/Номерний знак\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/);
-    const carNumberMatch3 = fullText.match(/Номерний знак\s+(\d{5}[А-ЯІЇЄҐA-Z]{2})/);
-    const carNumberMatch4 = fullText.match(/Реєстраційний номер\s+(\d{5}[А-ЯІЇЄҐA-Z]{2})/);
+      const newCarNumberMatch3 = fullText.match(/4\.2\.\s*Реєстраційний номер\s+(\d{4}[А-ЯІЇЄҐA-Z]{2})/i);  // Формат: 0985ОЭ
+      const carNumberMatch1 = fullText.match(/Реєстраційний номер\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/);
+      const carNumberMatch2 = fullText.match(/Номерний знак\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/);
+      const carNumberMatch3 = fullText.match(/Номерний знак\s+(\d{5}[А-ЯІЇЄҐA-Z]{2})/);
+      const carNumberMatch4 = fullText.match(/Реєстраційний номер\s+(\d{5}[А-ЯІЇЄҐA-Z]{2})/);
+      const carNumberMatch5 = fullText.match(/Номерний знак\s+(\d{4}[А-ЯІЇЄҐA-Z]{2})/);  // Формат: 0985ОЭ
+      const carNumberMatch6 = fullText.match(/Реєстраційний номер\s+(\d{4}[А-ЯІЇЄҐA-Z]{2})/);  // Формат: 0985ОЭ
 
     carNumber =
         (newCarNumberMatch && newCarNumberMatch[1]) ||
         (newCarNumberMatch2 && newCarNumberMatch2[1]) ||
+        (newCarNumberMatch3 && newCarNumberMatch3[1]) ||
       (carNumberMatch1 && carNumberMatch1[1]) ||
       (carNumberMatch2 && carNumberMatch2[1]) ||
       (carNumberMatch3 && carNumberMatch3[1]) ||
       (carNumberMatch4 && carNumberMatch4[1]) ||
+      (carNumberMatch5 && carNumberMatch5[1]) ||
+      (carNumberMatch6 && carNumberMatch6[1]) ||
       null;
     }
 
