@@ -61,10 +61,18 @@ export default async function handler(req, res) {
     // 4. ФИО страхувальника
     let insuredName = null;
 
+    // Формат: "3\nСТРАХУВАЛЬНИК\nДУДНІК ОЛЕКСІЙ АНДРЙОВИЧ" (цифра без точки, заглавными)
+    const formatWithNumberMatch = fullText.match(/\n(\d+)\s*\n\s*СТРАХУВАЛЬНИК\s*\n\s*([А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]+)/);
+    if (formatWithNumberMatch) {
+      insuredName = formatWithNumberMatch[2].trim();
+    }
+
     // Новий формат: "1. СТРАХУВАЛЬНИК" з ПІБ на наступному рядку (підтримка змішаного регістру)
-    const newFormatMatch = fullText.match(/1\.\s*СТРАХУВАЛЬНИК[^\n]*\n[^\n]*\n\s*([А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+)/i);
-    if (newFormatMatch) {
-      insuredName = newFormatMatch[1].trim();
+    if (!insuredName) {
+      const newFormatMatch = fullText.match(/1\.\s*СТРАХУВАЛЬНИК[^\n]*\n[^\n]*\n\s*([А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+)/i);
+      if (newFormatMatch) {
+        insuredName = newFormatMatch[1].trim();
+      }
     }
 
     // Старий формат: секція 3. Страхувальник (підтримка змішаного регістру)
@@ -80,6 +88,14 @@ export default async function handler(req, res) {
           // Стандартный формат: Манчук Іван Михайлович
           section3Text.match(/([А-ЯЁІЇЄҐЬ][а-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][а-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][а-яёіїєґь]+)(?=\s*РНОКПП|\s*\d{10}|\s*дата)/);
         insuredName = nameMatch ? nameMatch[1].trim() : null;
+      }
+    }
+
+    // Запасний варіант: "СТРАХУВАЛЬНИК" заглавними з ФІО на наступному рядку
+    if (!insuredName) {
+      const uppercaseMatch = fullText.match(/СТРАХУВАЛЬНИК\s*\n\s*([А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]+)/);
+      if (uppercaseMatch) {
+        insuredName = uppercaseMatch[1].trim();
       }
     }
 
