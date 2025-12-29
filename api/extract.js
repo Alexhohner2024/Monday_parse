@@ -120,9 +120,9 @@ export default async function handler(req, res) {
     // 5. Дата початку
     let startDate = null;
     
-    // Формат: "З 00:00 04 січня 2025 р" (без точки після "р")
+    // Формат: "З 00:00 04 січня 2025 р" (без точки після "р", можливі пробіли/переноси строк)
     const startDateMatch0 = fullText.match(
-      /З\s+(\d{2}:\d{2})\s+(\d{1,2})\s+(січня|лютого|березня|квітня|травня|червня|липня|серпня|вересня|жовтня|листопада|грудня)\s+(\d{4})\s+р\b/i
+      /З[\s\n]+(\d{2}:\d{2})[\s\n]+(\d{1,2})[\s\n]+(січня|лютого|березня|квітня|травня|червня|липня|серпня|вересня|жовтня|листопада|грудня)[\s\n]+(\d{4})[\s\n]+р[\s\.\n]?/i
     );
     if (startDateMatch0) {
       const monthMap = {
@@ -134,6 +134,42 @@ export default async function handler(req, res) {
       const month = monthMap[startDateMatch0[3].toLowerCase()];
       const year = startDateMatch0[4];
       startDate = `${day}.${month}.${year}, ${startDateMatch0[1]}`;
+    }
+    
+    // Альтернативний варіант: в контексті "5.1" або "початку" (з урахуванням переносів строк)
+    if (!startDate) {
+      const startDateMatch0Alt = fullText.match(
+        /(?:5\.1|початку)[\s\S]*?З[\s\n]+(\d{2}:\d{2})[\s\n]+(\d{1,2})[\s\n]+(січня|лютого|березня|квітня|травня|червня|липня|серпня|вересня|жовтня|листопада|грудня)[\s\n]+(\d{4})[\s\n]+р[\s\.\n]?/i
+      );
+      if (startDateMatch0Alt) {
+        const monthMap = {
+          'січня': '01', 'лютого': '02', 'березня': '03', 'квітня': '04',
+          'травня': '05', 'червня': '06', 'липня': '07', 'серпня': '08',
+          'вересня': '09', 'жовтня': '10', 'листопада': '11', 'грудня': '12'
+        };
+        const day = startDateMatch0Alt[2].padStart(2, '0');
+        const month = monthMap[startDateMatch0Alt[3].toLowerCase()];
+        const year = startDateMatch0Alt[4];
+        startDate = `${day}.${month}.${year}, ${startDateMatch0Alt[1]}`;
+      }
+    }
+    
+    // Ще один варіант: більш вільний пошук без строгих вимог до пробілів
+    if (!startDate) {
+      const startDateMatch0Flex = fullText.match(
+        /З[\s\n]*(\d{2}:\d{2})[\s\n]*(\d{1,2})[\s\n]*(січня|лютого|березня|квітня|травня|червня|липня|серпня|вересня|жовтня|листопада|грудня)[\s\n]*(\d{4})[\s\n]*р\b/i
+      );
+      if (startDateMatch0Flex) {
+        const monthMap = {
+          'січня': '01', 'лютого': '02', 'березня': '03', 'квітня': '04',
+          'травня': '05', 'червня': '06', 'липня': '07', 'серпня': '08',
+          'вересня': '09', 'жовтня': '10', 'листопада': '11', 'грудня': '12'
+        };
+        const day = startDateMatch0Flex[2].padStart(2, '0');
+        const month = monthMap[startDateMatch0Flex[3].toLowerCase()];
+        const year = startDateMatch0Flex[4];
+        startDate = `${day}.${month}.${year}, ${startDateMatch0Flex[1]}`;
+      }
     }
     
     const startDateMatch1 =
