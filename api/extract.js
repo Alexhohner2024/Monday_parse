@@ -34,10 +34,18 @@ export default async function handler(req, res) {
     // 3. Цена
     let price = null;
 
+    // Формат: "15 Розмір страхової премії" з ціною "2 479.00" (з пробелом та точкою)
+    const premiumPriceMatch = fullText.match(/15\s+Розмір страхової премії[^\d]*(\d+)\s+(\d+)\.00/i);
+    if (premiumPriceMatch) {
+      price = premiumPriceMatch[1] + premiumPriceMatch[2]; // Об'єднуємо: "2" + "479" = "2479"
+    }
+
     // Новий формат: "990,00 (Дев'ятсот дев'яносто гривень 00 копійок)" або "5.4. Страховий платіж, грн 990,00"
-    const newPriceMatch = fullText.match(/(?:5\.4\.\s*)?Страховий\s+платіж[^\d]*(\d+),00/i);
-    if (newPriceMatch) {
-      price = newPriceMatch[1];
+    if (!price) {
+      const newPriceMatch = fullText.match(/(?:5\.4\.\s*)?Страховий\s+платіж[^\d]*(\d+),00/i);
+      if (newPriceMatch) {
+        price = newPriceMatch[1];
+      }
     }
 
     // Старі формати
@@ -111,6 +119,23 @@ export default async function handler(req, res) {
 
     // 5. Дата початку
     let startDate = null;
+    
+    // Формат: "З 00:00 04 січня 2025 р" (без точки після "р")
+    const startDateMatch0 = fullText.match(
+      /З\s+(\d{2}:\d{2})\s+(\d{1,2})\s+(січня|лютого|березня|квітня|травня|червня|липня|серпня|вересня|жовтня|листопада|грудня)\s+(\d{4})\s+р\b/i
+    );
+    if (startDateMatch0) {
+      const monthMap = {
+        'січня': '01', 'лютого': '02', 'березня': '03', 'квітня': '04',
+        'травня': '05', 'червня': '06', 'липня': '07', 'серпня': '08',
+        'вересня': '09', 'жовтня': '10', 'листопада': '11', 'грудня': '12'
+      };
+      const day = startDateMatch0[2].padStart(2, '0');
+      const month = monthMap[startDateMatch0[3].toLowerCase()];
+      const year = startDateMatch0[4];
+      startDate = `${day}.${month}.${year}, ${startDateMatch0[1]}`;
+    }
+    
     const startDateMatch1 =
       fullText.match(/5\.1[\s\S]*?(\d{2}:\d{2})\s+(\d{2}\.\d{2}\.\d{4})/) ||
       fullText.match(/з\s+(\d{2}:\d{2})\s+(\d{2}\.\d{2}\.\d{4})/) ||
@@ -123,9 +148,9 @@ export default async function handler(req, res) {
       /з\s+(\d{2}:\d{2})\s+год\.\s+(\d{1,2})\s+(січня|лютого|березня|квітня|травня|червня|липня|серпня|вересня|жовтня|листопада|грудня)\s+(\d{4})\s+р\./i
     );
 
-    if (startDateMatch1) {
+    if (!startDate && startDateMatch1) {
       startDate = `${startDateMatch1[2]}, ${startDateMatch1[1]}`;
-    } else if (startDateMatch2) {
+    } else if (!startDate && startDateMatch2) {
       const monthMap = {
         'січня': '01', 'лютого': '02', 'березня': '03', 'квітня': '04',
         'травня': '05', 'червня': '06', 'липня': '07', 'серпня': '08',
@@ -135,7 +160,7 @@ export default async function handler(req, res) {
       const month = monthMap[startDateMatch2[3]];
       const year = startDateMatch2[4];
       startDate = `${day}.${month}.${year}, ${startDateMatch2[1]}`;
-    } else if (startDateMatch3) {
+    } else if (!startDate && startDateMatch3) {
       const monthMap = {
         'січня': '01', 'лютого': '02', 'березня': '03', 'квітня': '04',
         'травня': '05', 'червня': '06', 'липня': '07', 'серпня': '08',
