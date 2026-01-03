@@ -70,7 +70,8 @@ export default async function handler(req, res) {
     let insuredName = null;
 
     // Формат: "3\nСТРАХУВАЛЬНИК\nДУДНІК ОЛЕКСІЙ АНДРЙОВИЧ" (цифра без точки, заглавными)
-    const formatWithNumberMatch = fullText.match(/\n(\d+)\s*\n\s*СТРАХУВАЛЬНИК\s*\n\s*([А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]+)/);
+    // Або "3\nСТРАХУВАЛЬНИК\nНівня Віталій Олексійович" (цифра без точки, змішаний регістр)
+    const formatWithNumberMatch = fullText.match(/\n(\d+)\s*\n\s*СТРАХУВАЛЬНИК\s*\n\s*([А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+)/i);
     if (formatWithNumberMatch) {
       insuredName = formatWithNumberMatch[2].trim();
     }
