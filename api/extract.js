@@ -83,6 +83,14 @@ export default async function handler(req, res) {
       }
     }
 
+    // Формат: "3. СТРАХУВАЛЬНИК" з ПІБ в змішаному регістрі без слова "Найменування"
+    if (!insuredName) {
+      const format3Match = fullText.match(/3\.\s*СТРАХУВАЛЬНИК[^\n]*\n[^\n]*\n\s*([А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+)/i);
+      if (format3Match) {
+        insuredName = format3Match[1].trim();
+      }
+    }
+
     // Старий формат: секція 3. Страхувальник (підтримка змішаного регістру)
     if (!insuredName) {
       const section3Match = fullText.match(/3\.\s*Страхувальник([\s\S]*?)(?=4\.|$)/);
