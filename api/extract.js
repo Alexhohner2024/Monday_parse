@@ -40,6 +40,14 @@ export default async function handler(req, res) {
       price = premiumPriceMatch[1] + premiumPriceMatch[2]; // Об'єднуємо: "2" + "479" = "2479"
     }
 
+    // Формат: "15 Розмір страхової премії" з ціною "576.00" (без пробела, з точкою)
+    if (!price) {
+      const premiumPriceMatch2 = fullText.match(/15\s+Розмір страхової премії[^\d]*(\d+)\.00/i);
+      if (premiumPriceMatch2) {
+        price = premiumPriceMatch2[1];
+      }
+    }
+
     // Новий формат: "990,00 (Дев'ятсот дев'яносто гривень 00 копійок)" або "5.4. Страховий платіж, грн 990,00"
     if (!price) {
       const newPriceMatch = fullText.match(/(?:5\.4\.\s*)?Страховий\s+платіж[^\d]*(\d+),00/i);
