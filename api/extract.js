@@ -28,20 +28,23 @@ export default async function handler(req, res) {
       const policyNumber = policyMatch ? policyMatch[1] : null;
 
       // 2. ИПН (РНОКПП)
+      // В Зеленой карте часто идет просто числом 10 знаков после ФИО
       const ipnMatch = fullText.match(/РНОКПП[^\d]*(\d{10})/i) || 
+                       fullText.match(/(?:\n|^)(\d{10})(?:\n|$)/m) ||
                        fullText.match(/(\d{10})/);
       const ipn = ipnMatch ? ipnMatch[1] : null;
 
       // 3. Цена (Формат: 1199,00)
       let price = null;
-      const priceMatch = fullText.match(/10\s+Розмір\s+страхової\s+премії[^\n]*\n\s*(\d+)[.,]00/i);
+      // Ищем "10 Розмір страхової премії" и число на следующей строке или рядом
+      const priceMatch = fullText.match(/10\s+Розмір\s+страхової\s+премії[^\n]*\n\s*(\d+)[.,]00/i) ||
+                         fullText.match(/10\s+Розмір\s+страхової\s+премії[^\d]*(\d+)[.,]00/i);
       if (priceMatch) {
         price = priceMatch[1].replace(/\s/g, '');
       }
 
       // 4. ФИО страхувальника (UA или EN)
       let insuredName = null;
-      // В подписи: Страхувальник \n Karainaki Oleksandr
       const signatureMatch = fullText.match(/Страхувальник\s*\n\s*([A-ZА-ЯІЇЄҐЬ][A-ZА-ЯІЇЄҐЬа-яёіїєґь\s-]+)(?=\n|Підписано)/i);
       if (signatureMatch) {
         insuredName = signatureMatch[1].trim();
@@ -59,19 +62,16 @@ export default async function handler(req, res) {
       let endDate = null;
       let issueDate = null;
 
-      // Дата начала (5.1. Дата початку)
       const startDateMatch = fullText.match(/5\.1\.\s*Дата\s+початку[^\d]*(\d{2}\.\d{2}\.\d{4})/i);
       if (startDateMatch) {
         startDate = startDateMatch[1] + ", 00:00";
       }
 
-      // Дата окончания (5.2. Дата закінчення)
       const endDateMatch = fullText.match(/5\.2\.\s*Дата\s+закінчення[^\d]*(\d{2}\.\d{2}\.\d{4})/i);
       if (endDateMatch) {
         endDate = endDateMatch[1];
       }
 
-      // Дата оформления (6. Дата укладення Договору)
       const issueDateMatch = fullText.match(/6\s+Дата\s+укладення\s+Договору[^\n]*\n\s*(\d{2}\.\d{2}\.\d{4})/i);
       if (issueDateMatch) {
         issueDate = issueDateMatch[1];
@@ -82,21 +82,17 @@ export default async function handler(req, res) {
       let carNumber = null;
       let vinNumber = null;
 
-      // Марка (9.3. Марка)
       const brandMatch = fullText.match(/9\.3\.\s*Марка\s*\n\s*([A-Z0-9\s-]+)/i);
-      // Модель (9.4. Модель)
       const modelMatch = fullText.match(/9\.4\.\s*Модель\s*\n\s*([A-Z0-9\s-]+)/i);
       if (brandMatch && modelMatch) {
         carModel = `${brandMatch[1].trim()} ${modelMatch[1].trim()}`;
       }
 
-      // Регистрационный номер (9.5. Реєстраційний номер)
       const regNumberMatch = fullText.match(/9\.5\.\s*Реєстраційний\s+номер\s*\n\s*([A-ZА-Я0-9-]+)/i);
       if (regNumberMatch) {
         carNumber = regNumberMatch[1].trim();
       }
 
-      // VIN (9.7. VIN)
       const vinMatch = fullText.match(/9\.7\.\s*VIN[^\n]*\n\s*([A-Z0-9]{11,17})/i);
       if (vinMatch) {
         vinNumber = vinMatch[1].trim();
