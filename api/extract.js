@@ -23,9 +23,9 @@ export default async function handler(req, res) {
                         /UA\/\s*\d+/.test(fullText);
 
     if (isGreenCard) {
-      // --- СПЕЦИАЛИЗИРОВАННАЯ ЛОГИКА ДЛЯ ЗЕЛЕНОЙ КАРТЫ (ТАБЛИЧНЫЙ ФОРМАТ) ---
+      // --- УЛУЧШЕННАЯ ЛОГИКА ДЛЯ ЗЕЛЕНОЙ КАРТЫ (ПОИСК МЕЖДУ ПУНКТАМИ) ---
       
-      // Номер полиса: ищем UA/ с возможным пробелом и цифрами
+      // Номер полиса
       const policyMatch = fullText.match(/UA\/\s*(\d+)/);
       const policyNumber = policyMatch ? `UA/${policyMatch[1]}` : null;
 
@@ -35,17 +35,17 @@ export default async function handler(req, res) {
                        fullText.match(/(\d{10})/);
       const ipn = ipnMatch ? ipnMatch[1] : null;
 
-      // Цена: ищем в пункте 10 "Розмір страхової премії"
+      // Цена: ищем число в конце строки, содержащей "10" и "Розмір страхової премії"
       let price = null;
-      // Ищем строку с пунктом 10 и берем число в конце (может быть с пробелом как 2 510)
-      const priceLineMatch = fullText.match(/10\s+Розмір\s+страхової\s+премії[^\n\d]*([\d\s]+)(?:,00|\.00|(?=\n|$))/i);
-      if (priceLineMatch) {
-          price = priceLineMatch[1].replace(/\s/g, '');
-      }
-      if (!price) {
-          // Запасной вариант для цены
-          const altPriceMatch = fullText.match(/10\s+Розмір[\s\S]{0,100}?\n\s*([\d\s]{1,10})(?:,00|\.00|(?=\n|$))/i);
-          if (altPriceMatch) price = altPriceMatch[1].replace(/\s/g, '');
+      const priceLines = fullText.split('\n');
+      for (let line of priceLines) {
+          if (line.includes('10') && (line.includes('Розмір') || line.includes('премії'))) {
+              const nums = line.match(/(\d[\d\s]+)(?:,00|\.00|(?=\s|$))/g);
+              if (nums) {
+                  price = nums[nums.length - 1].replace(/\s/g, '');
+                  break;
+              }
+          }
       }
 
       // ФИО
@@ -74,26 +74,49 @@ export default async function handler(req, res) {
                              fullText.match(/(?:6|укладення)[^\d]*(\d{2}\.\d{2}\.\d{4})/i);
       const issueDate = issueDateMatch ? issueDateMatch[1] : null;
 
-      // Авто (Марка/Модель) - ищем в пунктах 9.3 и 9.4
+      // --- ЛОГИКА "МЕЖДУ ПУНКТАМИ" ДЛЯ АВТО ---
+      
+      // 9.3 - 9.5 (Марка и Модель)
       let carModel = null;
-      const brandMatch = fullText.match(/9\.3\.\s*Марка\s+([A-Z0-9\s-]+)(?=\s*9\.\d+|$)/i) || 
-                         fullText.match(/9\.3\.[^\n]*\n\s*([A-Z0-9\s-]+)/i);
-      const modelMatch = fullText.match(/9\.4\.\s*Модель\s+([A-Z0-9\s-]+)(?=\s*9\.\d+|$)/i) ||
-                         fullText.match(/9\.4\.[^\n]*\n\s*([A-Z0-9\s-]+)/i);
-      if (brandMatch && modelMatch) {
-          carModel = `${brandMatch[1].trim()} ${modelMatch[1].trim()}`;
+      const carModelSection = fullText.match(/9\.3\.[\s\S]*?9\.5\./);
+      if (carModelSection) {
+          carModel = carModelSection[0]
+              .replace(/9\.3\.\s*Марка/i, '')
+              .replace(/9\.4\.\s*Модель/i, '')
+              .replace(/9\.5\./, '')
+              .replace(/[\n\r]/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
       }
 
-      // Госномер - пункт 9.5
-      const regNumberMatch = fullText.match(/9\.5\.\s*Реєстраційний\s+номер\s+([A-ZА-Я0-9-]+)/i) ||
-                             fullText.match(/9\.5\.[^\n]*\n\s*([A-ZА-Я0-9-]+)/i);
-      const carNumber = regNumberMatch ? regNumberMatch[1].trim() : null;
+      // 9.5 - 9.6 (Госномер)
+      let carNumber = null;
+      const carNumberSection = fullText.match(/9\.5\.[\s\S]*?9\.6\./);
+      if (carNumberSection) {
+          carNumber = carNumberSection[0]
+              .replace(/9\.5\.\s*Реєстраційний\s+номер/i, '')
+              .replace(/9\.6\./, '')
+              .replace(/[\n\r]/g, '')
+              .replace(/\s+/g, '')
+              .trim();
+      }
 
-      // VIN - пункт 9.7
-      const vinMatch = fullText.match(/9\.7\.\s*VIN[^\n]*\n\s*([A-Z0-9]{11,17})/i) || 
-                       fullText.match(/9\.7\.\s*VIN\s+([A-Z0-9]{11,17})/i) ||
-                       fullText.match(/[A-HJ-NPR-Z0-9]{17}/);
-      const vinNumber = vinMatch ? (Array.isArray(vinMatch) ? vinMatch[0] : (vinMatch[1] || vinMatch[0])) : null;
+      // 9.7 - 9.8 (VIN)
+      let vinNumber = null;
+      const vinSection = fullText.match(/9\.7\.[\s\S]*?9\.8\./);
+      if (vinSection) {
+          vinNumber = vinSection[0]
+              .replace(/9\.7\.\s*VIN[^\n]*/i, '')
+              .replace(/9\.8\./, '')
+              .replace(/[\n\r]/g, '')
+              .replace(/\s+/g, '')
+              .trim();
+      }
+      // Запасной поиск VIN, если секция не сработала
+      if (!vinNumber || vinNumber.length < 10) {
+          const vinBackup = fullText.match(/[A-HJ-NPR-Z0-9]{17}/);
+          if (vinBackup) vinNumber = vinBackup[0];
+      }
 
       const result = `${price || ''}|${ipn || ''}|${policyNumber || ''}`;
 
