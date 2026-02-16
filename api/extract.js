@@ -36,35 +36,21 @@ export default async function handler(req, res) {
       let insuredName = null;
       const lines = fullText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
       
-// 1. Поиск в блоке подписей (для policy.pdf)
-      const signIdx = lines.findIndex(l => l === 'Страхувальник');
-      if (signIdx !== -1 && lines[signIdx+1] && lines[signIdx+1].length > 5 && !lines[signIdx+1].includes('Підписано')) {
-          insuredName = lines[signIdx+1];
-      }
-      
-      // 2. Ищем строку с ФИО (Латиница, длинная, без служебных слов)
-      if (!insuredName) {
-          const nameLine = lines.find(l => /^[A-Z\s-]+$/.test(l) && l.length > 8 && !l.includes('POLICYHOLDER') && !l.includes('ADDRESS') && !l.includes('NAME'));
-          if (nameLine) {
-              insuredName = nameLine;
+      // Ищем по контексту СТРАХУВАЛЬНИК → Прізвище, ім'я, по батькові
+      const nameIdx = lines.findIndex(l => l.includes('Прізвище, ім\'я, по батькові'));
+      if (nameIdx !== -1) {
+          // Сначала ищем в той же строке
+          const sameLine = lines[nameIdx];
+          const nameInSameLine = sameLine.match(/\s{2,}([A-Z][A-Z\s]+)$/);
+          if (nameInSameLine) {
+              insuredName = nameInSameLine[1].trim();
           } else {
-              // Fallback: поиск по Прізвище, ім'я, по батькові
-              const nameIdx = lines.findIndex(l => l.includes('Прізвище, ім\'я, по батькові'));
-              if (nameIdx !== -1) {
-                  // Сначала ищем в той же строке
-                  const sameLine = lines[nameIdx];
-                  const nameInSameLine = sameLine.match(/\s{2,}([A-Z][A-Z\s]+)$/);
-                  if (nameInSameLine) {
-                      insuredName = nameInSameLine[1].trim();
-                  } else {
-                      // Потом ищем в следующих строках
-                      for (let i = nameIdx + 1; i < lines.length; i++) {
-                          const line = lines[i].trim();
-                          if (line.length > 5 && !line.includes('найменування') && !line.includes('(за наявності)')) {
-                              insuredName = line;
-                              break;
-                          }
-                      }
+              // Потом ищем в следующих строках
+              for (let i = nameIdx + 1; i < lines.length; i++) {
+                  const line = lines[i].trim();
+                  if (line.length > 5 && !line.includes('найменування') && !line.includes('(за наявності)')) {
+                      insuredName = line;
+                      break;
                   }
               }
           }
