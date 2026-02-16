@@ -51,11 +51,19 @@ export default async function handler(req, res) {
               // Fallback: поиск по Прізвище, ім'я, по батькові
               const nameIdx = lines.findIndex(l => l.includes('Прізвище, ім\'я, по батькові'));
               if (nameIdx !== -1) {
-                  for (let i = nameIdx + 1; i < lines.length; i++) {
-                      const line = lines[i].trim();
-                      if (line.length > 5 && !line.includes('найменування') && !line.includes('(за наявності)')) {
-                          insuredName = line;
-                          break;
+                  // Сначала ищем в той же строке
+                  const sameLine = lines[nameIdx];
+                  const nameInSameLine = sameLine.match(/\s{2,}([A-Z][A-Z\s]+)$/);
+                  if (nameInSameLine) {
+                      insuredName = nameInSameLine[1].trim();
+                  } else {
+                      // Потом ищем в следующих строках
+                      for (let i = nameIdx + 1; i < lines.length; i++) {
+                          const line = lines[i].trim();
+                          if (line.length > 5 && !line.includes('найменування') && !line.includes('(за наявності)')) {
+                              insuredName = line;
+                              break;
+                          }
                       }
                   }
               }
