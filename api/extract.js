@@ -24,8 +24,6 @@ export default async function handler(req, res) {
                         /UA\/\s*\d+/.test(fullText);
 
     if (isGreenCard) {
-      // --- ФИНАЛЬНАЯ УНИВЕРСАЛЬНАЯ ЛОГИКА ---
-      
       // Номер полиса: UA/078/XXXXXXXX или UA/ XXXXXXXX
       const policyMatch = fullText.match(/UA\/\d{3}\/\d+/) || fullText.match(/UA\/\s*(\d+)/);
       const policyNumber = policyMatch ? policyMatch[0].replace(/\s+/g, '') : null;
@@ -35,37 +33,45 @@ export default async function handler(req, res) {
                        fullText.match(/(\d{10})/);
       const ipn = ipnMatch ? ipnMatch[1] : null;
 
-      // Цена (Price) - Ищем формат ,00 или число перед "11 Інші умови"
+      // Цена (Price)
       let price = null;
       const priceFormatMatch = fullText.match(/(\d[\d\s]*)(?:,00|\.00)/);
       if (priceFormatMatch) {
           price = priceFormatMatch[1].replace(/\s/g, '');
       } else {
-          // Запасной вариант для 30105159.pdf (цена перед пунктом 11)
           const beforeSection11 = fullText.match(/(\d[\d\s]{2,10})\n\s*11\s+Інші/);
           if (beforeSection11) {
               price = beforeSection11[1].replace(/\s/g, '');
           }
       }
 
-      // ФИО (Insured Name) - Поиск по приоритетам
+      // ФИО (Insured Name) - Финальная универсальная логика
       let insuredName = null;
-      // Приоритет 1: Блок подписей (обычно самый чистый текст)
-      const signatureMatch = fullText.match(/Страхувальник\s*\n\s*([A-ZА-ЯІЇЄҐЬ\s-]+)(?=\n|Підписано|РНОКПП)/i);
-      if (signatureMatch) {
-          insuredName = signatureMatch[1].trim().split('\n')[0].trim();
+      
+      // Приоритет 1: Поиск латинского имени прямо перед 10-значным ИПН (для policy.pdf)
+      if (ipn) {
+          const nameBeforeIpn = new RegExp(`([A-Z\\s-]+)\\n\\s*${ipn}`, 'i');
+          const nameBeforeIpnMatch = fullText.match(nameBeforeIpn);
+          if (nameBeforeIpnMatch && nameBeforeIpnMatch[1].trim().length > 5) {
+              insuredName = nameBeforeIpnMatch[1].trim().split('\n').pop().trim();
+          }
       }
-      // Приоритет 2: Пункт 9 (ПІБ ТА АДРЕСА)
+
+      // Приоритет 2: Блок подписей
       if (!insuredName || insuredName.length < 5) {
-          const nameIn9 = fullText.match(/9\.\s*ПІБ[^\n]*\n\s*([A-ZА-ЯІЇЄҐЬ\s-]+)/i);
+          const signatureMatch = fullText.match(/Страхувальник\s*\n\s*([A-ZА-ЯІЇЄҐЬ\s-]+)(?=\n|Підписано|РНОКПП)/i);
+          if (signatureMatch) {
+              insuredName = signatureMatch[1].trim().split('\n')[0].trim();
+          }
+      }
+      
+      // Приоритет 3: Пункты 9 или 3
+      if (!insuredName || insuredName.length < 5) {
+          const nameIn9 = fullText.match(/9\.\s*ПІБ[^\n]*\n\s*([A-ZА-ЯІЇЄҐЬ\s-]+)/i) || 
+                          fullText.match(/3\.\s*СТРАХУВАЛЬНИК[^\n]*\n\s*([A-ZА-ЯІЇЄҐЬ\s-]+)/i);
           if (nameIn9) insuredName = nameIn9[1].trim().split('\n')[0].trim();
       }
-      // Приоритет 3: Пункт 3 (СТРАХУВАЛЬНИК)
-      if (!insuredName || insuredName.length < 5) {
-          const nameIn3 = fullText.match(/3\.\s*СТРАХУВАЛЬНИК[^\n]*\n\s*([A-ZА-ЯІЇЄҐЬ\s-]+)/i);
-          if (nameIn3) insuredName = nameIn3[1].trim().split('\n')[0].trim();
-      }
-      // Очистка от служебных слов
+
       if (insuredName) {
           insuredName = insuredName.replace(/Прізвище|ім'я|по батькові|NAME AND ADDRESS/gi, '').trim();
       }
@@ -82,15 +88,15 @@ export default async function handler(req, res) {
                              fullText.match(/(\d{2}\.\d{2}\.\d{4})/);
       const issueDate = issueDateMatch ? issueDateMatch[1] : null;
 
-      // VIN-код (Строго 17 символов)
+      // VIN-код (Улучшенный поиск 17-значного кода)
       let vinNumber = null;
       const vinMatches = fullText.match(/[A-HJ-NPR-Z0-9]{17}/g);
       if (vinMatches) {
-          // Берем тот, который не является ИПН (ИПН 10 цифр, VIN 17 символов)
-          vinNumber = vinMatches.find(v => v.length === 17);
+          // Ищем тот, который похож на реальный VIN (обычно начинается на буквы)
+          vinNumber = vinMatches.find(v => /^[A-Z]/.test(v)) || vinMatches[0];
       }
 
-      // Госномер (Шаблон: 2 буквы, 4 цифры, 2 буквы)
+      // Госномер
       let carNumber = null;
       const plateMatch = fullText.match(/[A-Z]{2}\s?\d{4}\s?[A-Z]{2}/);
       if (plateMatch) carNumber = plateMatch[0].replace(/\s/g, '');
@@ -127,7 +133,7 @@ export default async function handler(req, res) {
       });
 
     } else {
-      // --- СУЩЕСТВУЮЩАЯ ЛОГИКА (БЕЗ ИЗМЕНЕНИЙ) ---
+      // СТАНДАРТНАЯ ЛОГИКА (БЕЗ ИЗМЕНЕНИЙ)
       const policyMatch =
         fullText.match(/Поліс\s*№\s*(\d{9})/) ||
         fullText.match(/Акцепт\)\s*№\s*\d{6}-\d{4}-(\d{9})/) ||
