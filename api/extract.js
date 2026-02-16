@@ -34,23 +34,29 @@ export default async function handler(req, res) {
       if (priceMatch) price = priceMatch[1].replace(/\s/g, '');
 
       let insuredName = null;
-      const lines = fullText.split('\n').map(l => l.trim());
+      const lines = fullText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
       
-      // 1. Поиск в блоке подписей (для policy.pdf)
+// 1. Поиск в блоке подписей (для policy.pdf)
       const signIdx = lines.findIndex(l => l === 'Страхувальник');
       if (signIdx !== -1 && lines[signIdx+1] && lines[signIdx+1].length > 5 && !lines[signIdx+1].includes('Підписано')) {
           insuredName = lines[signIdx+1];
       }
       
-      // 2. Поиск под заголовком "СТРАХУВАЛЬНИК" (для 30105159.pdf)
+      // 2. Ищем строку с ФИО (Латиница, длинная, без служебных слов)
       if (!insuredName) {
-          const nameIdx = lines.findIndex(l => l.includes('Прізвище, ім\'я, по батькові'));
-          if (nameIdx !== -1) {
-              // Ищем следующую непустую строку
-              for (let i = nameIdx + 1; i < lines.length; i++) {
-                  if (lines[i].trim().length > 5 && !lines[i].includes('найменування')) {
-                      insuredName = lines[i].trim();
-                      break;
+          const nameLine = lines.find(l => /^[A-Z\s-]+$/.test(l) && l.length > 8 && !l.includes('POLICYHOLDER') && !l.includes('ADDRESS') && !l.includes('NAME'));
+          if (nameLine) {
+              insuredName = nameLine;
+          } else {
+              // Fallback: поиск по Прізвище, ім'я, по батькові
+              const nameIdx = lines.findIndex(l => l.includes('Прізвище, ім\'я, по батькові'));
+              if (nameIdx !== -1) {
+                  for (let i = nameIdx + 1; i < lines.length; i++) {
+                      const line = lines[i].trim();
+                      if (line.length > 5 && !line.includes('найменування') && !line.includes('(за наявності)')) {
+                          insuredName = line;
+                          break;
+                      }
                   }
               }
           }
@@ -72,8 +78,11 @@ export default async function handler(req, res) {
       const issueDate = issueDateMatch ? issueDateMatch[1] : null;
 
       let vinNumber = null;
-      const vinMatch = fullText.match(/9\.7\.\s*VIN[^\n]*\n\s*([A-Z0-9]{17})/i) || fullText.match(/([A-Z0-9]{17})/);
-      if (vinMatch) vinNumber = vinMatch[1] || vinMatch[0];
+      const vinMatches = fullText.match(/[A-Z0-9]{17}/g);
+      if (vinMatches) {
+          // Ищем строку, в которой есть и буквы, и цифры (настоящий VIN)
+          vinNumber = vinMatches.find(v => /[0-9]/.test(v) && /[A-Z]/.test(v)) || vinMatches[0];
+      }
 
       let carNumber = null;
       const plateMatch = fullText.match(/[A-Z]{2}\s?\d{4}\s?[A-Z]{2}/);
