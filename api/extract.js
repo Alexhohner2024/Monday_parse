@@ -33,27 +33,17 @@ export default async function handler(req, res) {
       const priceMatch = fullText.match(/(\d[\d\s]*)(?:,00|\.00)/) || fullText.match(/(\d[\d\s]{2,10})\n\s*11\s+Інші/);
       if (priceMatch) price = priceMatch[1].replace(/\s/g, '');
 
-      let insuredName = null;
-      const lines = fullText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      let insuredName = 'empty';
       
-      // Ищем по контексту СТРАХУВАЛЬНИК → Прізвище, ім'я, по батькові
-      const nameIdx = lines.findIndex(l => l.includes('Прізвище, ім\'я, по батькові'));
-      if (nameIdx !== -1) {
-          // Сначала ищем в той же строке
-          const sameLine = lines[nameIdx];
-          const nameInSameLine = sameLine.match(/або\s+([A-Z][A-Z\s]+)\s+найменування/);
-          if (nameInSameLine) {
-              insuredName = nameInSameLine[1].trim();
-          } else {
-              // Потом ищем в следующих строках
-              for (let i = nameIdx + 1; i < lines.length; i++) {
-                  const line = lines[i].trim();
-                  if (line.length > 5 && !line.includes('найменування') && !line.includes('(за наявності)')) {
-                      insuredName = line;
-                      break;
-                  }
-              }
-          }
+      // 1. Ищем строку, содержащую ключевой маркер
+      const nameLineMatch = fullText.split('\n').find(line => line.includes('(за наявності) або'));
+
+      if (nameLineMatch) {
+        // 2. Извлекаем текст строго между двумя маркерами
+        const match = nameLineMatch.match(/\(за наявності\) або\s+([A-Z\s]+?)\s+найменування/);
+        if (match && match[1]) {
+          insuredName = match[1].trim();
+        }
       }
 
       if (insuredName) {
