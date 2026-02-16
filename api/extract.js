@@ -41,7 +41,7 @@ export default async function handler(req, res) {
       if (nameIdx !== -1) {
           // Сначала ищем в той же строке
           const sameLine = lines[nameIdx];
-          const nameInSameLine = sameLine.match(/\s{2,}([A-Z][A-Z\s]+)$/);
+          const nameInSameLine = sameLine.match(/або\s+([A-Z][A-Z\s]+)\s+найменування/);
           if (nameInSameLine) {
               insuredName = nameInSameLine[1].trim();
           } else {
