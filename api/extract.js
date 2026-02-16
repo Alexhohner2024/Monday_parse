@@ -14,11 +14,15 @@ export default async function handler(req, res) {
     const pdfBuffer = Buffer.from(pdfData, 'base64');
     const data = await pdf(pdfBuffer);
     const fullText = data.text;
+    const upperText = fullText.toUpperCase();
 
-    // Определение типа документа: Зеленая карта
-    const isGreenCard = fullText.includes('ЗЕЛЕНА КАРТКА') || 
-                        fullText.includes('GREEN CARD') || 
-                        fullText.includes('МІЖНАРОДНОГО АВТОМОБІЛЬНОГО СТРАХУВАННЯ');
+    // Улучшенное определение типа документа: Зеленая карта
+    // Ищем ключевые слова или характерный формат номера полиса UA/078
+    const isGreenCard = upperText.includes('ЗЕЛЕНА КАРТКА') || 
+                        upperText.includes('GREEN CARD') || 
+                        upperText.includes('МІЖНАРОДНОГО АВТОМОБІЛЬНОГО СТРАХУВАННЯ') ||
+                        upperText.includes('INTERNATIONAL MOTOR INSURANCE') ||
+                        /UA\/078\/\d{8}/.test(fullText);
 
     if (isGreenCard) {
       // --- ЛОГИКА ДЛЯ ЗЕЛЕНОЙ КАРТЫ ---
@@ -28,30 +32,35 @@ export default async function handler(req, res) {
       const policyNumber = policyMatch ? policyMatch[1] : null;
 
       // 2. ИПН (РНОКПП)
-      // В Зеленой карте часто идет просто числом 10 знаков после ФИО
+      // В Зеленой карте ИПН часто идет 10-значным числом на отдельной строке после ФИО
       const ipnMatch = fullText.match(/РНОКПП[^\d]*(\d{10})/i) || 
-                       fullText.match(/(?:\n|^)(\d{10})(?:\n|$)/m) ||
+                       fullText.match(/(?:\n|^)\s*(\d{10})\s*(?:\n|$)/m) ||
                        fullText.match(/(\d{10})/);
       const ipn = ipnMatch ? ipnMatch[1] : null;
 
       // 3. Цена (Формат: 1199,00)
       let price = null;
-      // Ищем "10 Розмір страхової премії" и число на следующей строке или рядом
-      const priceMatch = fullText.match(/10\s+Розмір\s+страхової\s+премії[^\n]*\n\s*(\d+)[.,]00/i) ||
-                         fullText.match(/10\s+Розмір\s+страхової\s+премії[^\d]*(\d+)[.,]00/i);
-      if (priceMatch) {
-        price = priceMatch[1].replace(/\s/g, '');
+      // Ищем "10 Розмір страхової премії" и число в пределах следующих 100 символов
+      const priceBlock = fullText.match(/10\s+Розмір\s+страхової\s+премії[\s\S]{0,100}/i);
+      if (priceBlock) {
+          const priceValMatch = priceBlock[0].match(/(\d+)[.,]00/);
+          if (priceValMatch) {
+              price = priceValMatch[1].replace(/\s/g, '');
+          }
       }
 
       // 4. ФИО страхувальника (UA или EN)
       let insuredName = null;
+      // Сначала ищем в блоке подписи
       const signatureMatch = fullText.match(/Страхувальник\s*\n\s*([A-ZА-ЯІЇЄҐЬ][A-ZА-ЯІЇЄҐЬа-яёіїєґь\s-]+)(?=\n|Підписано)/i);
       if (signatureMatch) {
         insuredName = signatureMatch[1].trim();
       }
       
+      // Если не нашли, ищем в блоке NAME AND ADDRESS
       if (!insuredName) {
-        const nameBlockMatch = fullText.match(/NAME\s+AND\s+ADDRESS\s+OF\s+THE\s+POLICYHOLDER[^\n]*\n[^\n]*\n\s*([A-ZА-ЯІЇЄҐЬ\s-]+)/i);
+        const nameBlockMatch = fullText.match(/NAME\s+AND\s+ADDRESS\s+OF\s+THE\s+POLICYHOLDER[^\n]*\n[^\n]*\n\s*([A-ZА-ЯІЇЄҐЬ\s-]+)/i) ||
+                               fullText.match(/4\s+Страхувальник[^\n]*\n\s*([A-ZА-ЯІЇЄҐЬ\s-]+)/i);
         if (nameBlockMatch) {
           insuredName = nameBlockMatch[1].trim();
         }
@@ -62,17 +71,21 @@ export default async function handler(req, res) {
       let endDate = null;
       let issueDate = null;
 
+      // Дата начала (5.1. Дата початку)
       const startDateMatch = fullText.match(/5\.1\.\s*Дата\s+початку[^\d]*(\d{2}\.\d{2}\.\d{4})/i);
       if (startDateMatch) {
         startDate = startDateMatch[1] + ", 00:00";
       }
 
+      // Дата окончания (5.2. Дата закінчення)
       const endDateMatch = fullText.match(/5\.2\.\s*Дата\s+закінчення[^\d]*(\d{2}\.\d{2}\.\d{4})/i);
       if (endDateMatch) {
         endDate = endDateMatch[1];
       }
 
-      const issueDateMatch = fullText.match(/6\s+Дата\s+укладення\s+Договору[^\n]*\n\s*(\d{2}\.\d{2}\.\d{4})/i);
+      // Дата оформления (6. Дата укладення Договору)
+      const issueDateMatch = fullText.match(/6\s+Дата\s+укладення\s+Договору[^\n]*\n\s*(\d{2}\.\d{2}\.\d{4})/i) ||
+                             fullText.match(/Дата\s+укладення[^\d]*(\d{2}\.\d{2}\.\d{4})/i);
       if (issueDateMatch) {
         issueDate = issueDateMatch[1];
       }
@@ -82,18 +95,30 @@ export default async function handler(req, res) {
       let carNumber = null;
       let vinNumber = null;
 
+      // Марка и Модель
       const brandMatch = fullText.match(/9\.3\.\s*Марка\s*\n\s*([A-Z0-9\s-]+)/i);
       const modelMatch = fullText.match(/9\.4\.\s*Модель\s*\n\s*([A-Z0-9\s-]+)/i);
       if (brandMatch && modelMatch) {
         carModel = `${brandMatch[1].trim()} ${modelMatch[1].trim()}`;
+      } else {
+          // Запасной вариант для авто
+          const carBlock = fullText.match(/9\.3\.[\s\S]{0,100}9\.4\.[\s\S]{0,100}/i);
+          if (carBlock) {
+              const lines = carBlock[0].split('\n').map(l => l.trim()).filter(l => l && !l.includes('9.'));
+              if (lines.length >= 2) carModel = `${lines[0]} ${lines[1]}`;
+          }
       }
 
-      const regNumberMatch = fullText.match(/9\.5\.\s*Реєстраційний\s+номер\s*\n\s*([A-ZА-Я0-9-]+)/i);
+      // Регистрационный номер (9.5. Реєстраційний номер)
+      const regNumberMatch = fullText.match(/9\.5\.\s*Реєстраційний\s+номер\s*\n\s*([A-ZА-Я0-9-]+)/i) ||
+                             fullText.match(/9\.5\.[^\n]*\n\s*([A-ZА-Я0-9-]+)/i);
       if (regNumberMatch) {
         carNumber = regNumberMatch[1].trim();
       }
 
-      const vinMatch = fullText.match(/9\.7\.\s*VIN[^\n]*\n\s*([A-Z0-9]{11,17})/i);
+      // VIN (9.7. VIN)
+      const vinMatch = fullText.match(/9\.7\.\s*VIN[^\n]*\n\s*([A-Z0-9]{11,17})/i) ||
+                       fullText.match(/VIN[^\n]*\n\s*([A-Z0-9]{11,17})/i);
       if (vinMatch) {
         vinNumber = vinMatch[1].trim();
       }
