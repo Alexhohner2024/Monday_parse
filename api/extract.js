@@ -44,9 +44,15 @@ export default async function handler(req, res) {
       
       // 2. Поиск под заголовком "СТРАХУВАЛЬНИК" (для 30105159.pdf)
       if (!insuredName) {
-          const strIdx = lines.findIndex(l => l === 'СТРАХУВАЛЬНИК');
-          if (strIdx !== -1 && lines[strIdx+1] && lines[strIdx+1].length > 5) {
-              insuredName = lines[strIdx+1];
+          const nameIdx = lines.findIndex(l => l.includes('Прізвище, ім\'я, по батькові'));
+          if (nameIdx !== -1) {
+              // Ищем следующую непустую строку
+              for (let i = nameIdx + 1; i < lines.length; i++) {
+                  if (lines[i].trim().length > 5 && !lines[i].includes('найменування')) {
+                      insuredName = lines[i].trim();
+                      break;
+                  }
+              }
           }
       }
 
