@@ -387,6 +387,23 @@ export default async function handler(req, res) {
       }
     }
 
+    // 10. РќРѕРјРµСЂ С‚РµР»РµС„РѕРЅСѓ
+    let phone = null;
+    const insuredBlockMatch = fullText.match(/РЎС‚СЂР°С…СѓРІР°Р»СЊРЅРёРє[\s\S]{0,2000}/i);
+    const insuredBlockText = insuredBlockMatch ? insuredBlockMatch[0] : fullText;
+    const phoneMatch =
+      insuredBlockText.match(/(?:РќРѕРјРµСЂ\s+С‚РµР»РµС„РѕРЅСѓ|РўРµР»РµС„РѕРЅ)\s*[:\-]?\s*([+\d][\d\s()\-]{8,25})/i) ||
+      fullText.match(/(?:РќРѕРјРµСЂ\s+С‚РµР»РµС„РѕРЅСѓ|РўРµР»РµС„РѕРЅ)\s*[:\-]?\s*([+\d][\d\s()\-]{8,25})/i);
+    if (phoneMatch) {
+      let phoneDigits = phoneMatch[1].replace(/\D/g, '');
+      if (/^0\d{9}$/.test(phoneDigits)) {
+        phoneDigits = `38${phoneDigits}`;
+      } else if (/^80\d{9}$/.test(phoneDigits)) {
+        phoneDigits = `3${phoneDigits}`;
+      }
+      phone = /^380\d{9}$/.test(phoneDigits) ? phoneDigits : null;
+    }
+
     const result = `${price || ''}|${ipn || ''}|${policyNumber || ''}`;
 
     return res.status(200).json({
@@ -401,7 +418,8 @@ export default async function handler(req, res) {
         end_date: endDate,
         car_model: carModel,
         car_number: carNumber,
-        vin_number: vinNumber
+        vin_number: vinNumber,
+        phone: phone
       }
     });
   } catch (error) {
