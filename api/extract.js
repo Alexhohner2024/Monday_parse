@@ -389,11 +389,9 @@ export default async function handler(req, res) {
 
     // 10. РќРѕРјРµСЂ С‚РµР»РµС„РѕРЅСѓ
     let phone = null;
-    const insuredBlockMatch = fullText.match(/РЎС‚СЂР°С…СѓРІР°Р»СЊРЅРёРє[\s\S]{0,2000}/i);
-    const insuredBlockText = insuredBlockMatch ? insuredBlockMatch[0] : fullText;
-    const phoneMatch =
-      insuredBlockText.match(/(?:РќРѕРјРµСЂ\s+С‚РµР»РµС„РѕРЅСѓ|РўРµР»РµС„РѕРЅ)\s*[:\-]?\s*([+\d][\d\s()\-]{8,25})/i) ||
-      fullText.match(/(?:РќРѕРјРµСЂ\s+С‚РµР»РµС„РѕРЅСѓ|РўРµР»РµС„РѕРЅ)\s*[:\-]?\s*([+\d][\d\s()\-]{8,25})/i);
+    const phoneMatch = fullText.match(
+      /РЎС‚СЂР°С…СѓРІР°Р»СЊРЅРёРє[\s\S]{0,1200}?(?:РќРѕРјРµСЂ\s+С‚РµР»РµС„РѕРЅСѓ|РўРµР»РµС„РѕРЅ)\s*[:\-]?\s*(\+?\s*380[\s\-]?\d{2}[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}|\+?\s*38[\s\-]?\(?0\d{2}\)?[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}|0\d{2}[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}|0\d{9})/i
+    );
     if (phoneMatch) {
       let phoneDigits = phoneMatch[1].replace(/\D/g, '');
       if (/^0\d{9}$/.test(phoneDigits)) {
