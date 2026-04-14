@@ -389,17 +389,23 @@ export default async function handler(req, res) {
 
     // 10. РќРѕРјРµСЂ С‚РµР»РµС„РѕРЅСѓ
     let phone = null;
-    const phoneMatch = fullText.match(
-      /РЎС‚СЂР°С…СѓРІР°Р»СЊРЅРёРє[\s\S]{0,1200}?(?:РќРѕРјРµСЂ\s+С‚РµР»РµС„РѕРЅСѓ|РўРµР»РµС„РѕРЅ)\s*[:\-]?\s*(\+?\s*380[\s\-]?\d{2}[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}|\+?\s*38[\s\-]?\(?0\d{2}\)?[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}|0\d{2}[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}|0\d{9})/i
+    const phoneLabelRegex = /(?:РќРѕРјРµСЂ\s+С‚РµР»РµС„РѕРЅСѓ|РўРµР»РµС„РѕРЅ)\s*[:\-]?\s*([^\n\r]{0,120})/i;
+    const insuredPhoneLineMatch = fullText.match(
+      /РЎС‚СЂР°С…СѓРІР°Р»СЊРЅРёРє[\s\S]{0,2000}?(?:РќРѕРјРµСЂ\s+С‚РµР»РµС„РѕРЅСѓ|РўРµР»РµС„РѕРЅ)\s*[:\-]?\s*([^\n\r]{0,120})/i
     );
-    if (phoneMatch) {
-      let phoneDigits = phoneMatch[1].replace(/\D/g, '');
-      if (/^0\d{9}$/.test(phoneDigits)) {
-        phoneDigits = `38${phoneDigits}`;
-      } else if (/^80\d{9}$/.test(phoneDigits)) {
-        phoneDigits = `3${phoneDigits}`;
+    const phoneLineMatch = insuredPhoneLineMatch || fullText.match(phoneLabelRegex);
+    if (phoneLineMatch) {
+      const rawPhonePart = phoneLineMatch[1] || '';
+      const rawPhoneMatch = rawPhonePart.match(/\+?\s*\d[\d\s()\-]{8,25}/);
+      if (rawPhoneMatch) {
+        let phoneDigits = rawPhoneMatch[0].replace(/\D/g, '');
+        if (/^0\d{9}$/.test(phoneDigits)) {
+          phoneDigits = `38${phoneDigits}`;
+        } else if (/^80\d{9}$/.test(phoneDigits)) {
+          phoneDigits = `3${phoneDigits}`;
+        }
+        phone = /^380\d{9}$/.test(phoneDigits) ? phoneDigits : null;
       }
-      phone = /^380\d{9}$/.test(phoneDigits) ? phoneDigits : null;
     }
 
     const result = `${price || ''}|${ipn || ''}|${policyNumber || ''}`;
