@@ -389,9 +389,11 @@ export default async function handler(req, res) {
 
     // 10. РќРѕРјРµСЂ С‚РµР»РµС„РѕРЅСѓ
     let phone = null;
-    const phoneLabelRegex = /(?:РќРѕРјРµСЂ\s+С‚РµР»РµС„РѕРЅСѓ|РўРµР»РµС„РѕРЅ)\s*[:\-]?\s*([^\n\r]{0,120})/i;
+    const insuredLabel = '\\u0421\\u0442\\u0440\\u0430\\u0445\\u0443\\u0432\\u0430\\u043b\\u044c\\u043d\\u0438\\u043a';
+    const phoneLabel = '(?:\\u041d\\u043e\\u043c\\u0435\\u0440\\s+\\u0442\\u0435\\u043b\\u0435\\u0444\\u043e\\u043d\\u0443|\\u0422\\u0435\\u043b\\u0435\\u0444\\u043e\\u043d)';
+    const phoneLabelRegex = new RegExp(`${phoneLabel}\\s*[:\\-]?\\s*([^\\n\\r]{0,120})`, 'i');
     const insuredPhoneLineMatch = fullText.match(
-      /РЎС‚СЂР°С…СѓРІР°Р»СЊРЅРёРє[\s\S]{0,2000}?(?:РќРѕРјРµСЂ\s+С‚РµР»РµС„РѕРЅСѓ|РўРµР»РµС„РѕРЅ)\s*[:\-]?\s*([^\n\r]{0,120})/i
+      new RegExp(`${insuredLabel}[\\s\\S]{0,2000}?${phoneLabel}\\s*[:\\-]?\\s*([^\\n\\r]{0,120})`, 'i')
     );
     const phoneLineMatch = insuredPhoneLineMatch || fullText.match(phoneLabelRegex);
     if (phoneLineMatch) {
