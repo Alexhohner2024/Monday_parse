@@ -15,8 +15,14 @@ export default async function handler(req, res) {
     const data = await pdf(pdfBuffer);
     const fullText = data.text;
 
+    // 0. Определение типа полиса
+    const isGreenCard = /Зелена\s+картка|Green\s+Card|Carte\s+Internationale|КАРТКА МІЖНАРОДНОГО АВТОМОБІЛЬНОГО СТРАХУВАННЯ/i.test(fullText);
+    const insuranceType = isGreenCard ? 'Зелена картка' : 'Автоцивілка';
+
     // 1. Номер полиса
     const policyMatch =
+      fullText.match(/UA[\/.]\d{3}[\/.]([\d]+)/) ||  // Green Card: UA/078/41812487 або UA048.41846155
+      fullText.match(/Поліс\s*(?:№\s*)?UA\d{3}\.([\d]+)/) ||  // Green Card: Поліс UA048.41846155
       fullText.match(/Поліс\s*№\s*(\d{9})/) ||
       fullText.match(/Акцепт\)\s*№\s*\d{6}-\d{4}-(\d{9})/) ||  // Новий формат: Акцепт) № 611933-2212-224712543
       fullText.match(/№\s*(\d{9})/) ||
@@ -71,6 +77,14 @@ export default async function handler(req, res) {
     const priceMatch = priceMatch1 || priceMatch2;
     if (priceMatch) {
       price = priceMatch.length === 3 ? priceMatch[1] + priceMatch[2] : priceMatch[1];
+      }
+    }
+
+    // Green Card: "10 Розмір страхової премії, грн" з ціною через кому або крапку
+    if (!price && isGreenCard) {
+      const gcPriceMatch = fullText.match(/10\s+Розмір страхової премії[\s\S]*?([\d][\d\s]*)[,.]00/i);
+      if (gcPriceMatch) {
+        price = gcPriceMatch[1].replace(/\s/g, '');
       }
     }
 
@@ -134,6 +148,26 @@ export default async function handler(req, res) {
         // Смешанный регистр (разрешает любые комбинации заглавных/строчных)
         fullText.match(/Страхувальник\s+([А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+)/);
       insuredName = oldNameMatch ? oldNameMatch[1].trim() : null;
+    }
+
+    // Green Card: ФІО латиницею в секції 3 СТРАХУВАЛЬНИК
+    if (!insuredName && isGreenCard) {
+      // Формат: "найменування Страхувальника" + ФІО праворуч або на наступному рядку
+      const gcNameMatch = fullText.match(
+        /найменування\s+Страхувальника\s+([A-Z][A-Za-zА-Яа-яІЇЄҐіїєґ''\-]+(?:\s+[A-Z][A-Za-zА-Яа-яІЇЄҐіїєґ''\-]+){1,3})/i
+      );
+      if (gcNameMatch) {
+        insuredName = gcNameMatch[1].trim();
+      }
+    }
+    // Green Card fallback: секція 9 КАРТКИ (ПІБ ТА АДРЕСА СТРАХУВАЛЬНИКА)
+    if (!insuredName && isGreenCard) {
+      const gcCardNameMatch = fullText.match(
+        /ПІБ ТА АДРЕСА СТРАХУВАЛЬНИКА[\s\S]*?(?:VEHICLE\))[\s\n]*([A-ZА-ЯІЇЄҐ][A-Za-zА-Яа-яІЇЄҐіїєґ''\-]+(?:\s+[A-ZА-ЯІЇЄҐ][A-Za-zА-Яа-яІЇЄҐіїєґ''\-]+){1,3})/
+      );
+      if (gcCardNameMatch) {
+        insuredName = gcCardNameMatch[1].trim();
+      }
     }
 
     // 5. Дата початку
@@ -225,6 +259,16 @@ export default async function handler(req, res) {
       const month = monthMap[startDateMatch3[3]];
       const year = startDateMatch3[4];
       startDate = `${day}.${month}.${year}, ${startDateMatch3[1]}`;
+    }
+
+    // Green Card: "з 03.02.2026" або "з 12.02.2026." (без часу)
+    if (!startDate && isGreenCard) {
+      const gcStartMatch = fullText.match(
+        /(?:5\.1|початку)[.\s\S]*?з\s+(\d{2}\.\d{2}\.\d{4})\.?/i
+      );
+      if (gcStartMatch) {
+        startDate = `${gcStartMatch[1]}, 00:00`;
+      }
     }
 
     // 6. Дата закінчення
@@ -416,6 +460,7 @@ export default async function handler(req, res) {
       success: true,
       result: result,
       details: {
+        insurance_type: insuranceType,
         price: price,
         ipn: ipn,
         policy_number: policyNumber,
