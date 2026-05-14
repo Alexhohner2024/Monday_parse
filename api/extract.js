@@ -82,9 +82,9 @@ export default async function handler(req, res) {
 
     // Green Card: "10 Розмір страхової премії, грн" з ціною (можливо без .00)
     if (!price && isGreenCard) {
-      const gcPriceMatch = fullText.match(/10\.?\s*Розмір страхової премії[^\d]*?(\d+)[,.]?(?:\d{0,2})/i) ||
-                           fullText.match(/Розмір страхової премії[^\d]*?(\d+)[,.]?(?:\d{0,2})/i) ||
-                           fullText.match(/Страхова премія[^\d]*?(\d+)[,.]?(?:\d{0,2})/i);
+      const gcPriceMatch = fullText.match(/10\.?\s*Розмір страхової премії[^\d]*?((?:\d\s*)+)(?:[,.]\d{1,2})?/i) ||
+                           fullText.match(/Розмір страхової премії[^\d]*?((?:\d\s*)+)(?:[,.]\d{1,2})?/i) ||
+                           fullText.match(/Страхова премія[^\d]*?((?:\d\s*)+)(?:[,.]\d{1,2})?/i);
       if (gcPriceMatch) {
         price = gcPriceMatch[1].replace(/\s/g, '');
       }
