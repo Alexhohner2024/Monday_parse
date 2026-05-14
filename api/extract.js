@@ -80,9 +80,11 @@ export default async function handler(req, res) {
       }
     }
 
-    // Green Card: "10 Розмір страхової премії, грн" з ціною через кому або крапку
+    // Green Card: "10 Розмір страхової премії, грн" з ціною (можливо без .00)
     if (!price && isGreenCard) {
-      const gcPriceMatch = fullText.match(/10\s+Розмір страхової премії[\s\S]*?([\d][\d\s]*)[,.]00/i);
+      const gcPriceMatch = fullText.match(/10\.?\s*Розмір страхової премії[^\d]*?(\d+)[,.]?(?:\d{0,2})/i) ||
+                           fullText.match(/Розмір страхової премії[^\d]*?(\d+)[,.]?(?:\d{0,2})/i) ||
+                           fullText.match(/Страхова премія[^\d]*?(\d+)[,.]?(?:\d{0,2})/i);
       if (gcPriceMatch) {
         price = gcPriceMatch[1].replace(/\s/g, '');
       }
@@ -394,6 +396,29 @@ export default async function handler(req, res) {
       (carNumberMatch5 && carNumberMatch5[1]) ||
       (carNumberMatch6 && carNumberMatch6[1]) ||
       null;
+    }
+
+    // Green Card / General fallback: пошук простого номеру в тексті
+    if (!carNumber) {
+      const fallbackMatch = fullText.match(/([A-ZА-ЯІЇЄҐ]{2}\s?\d{4}\s?[A-ZА-ЯІЇЄҐ]{2})/i) ||
+                            fullText.match(/(\d{4,5}\s?[A-ZА-ЯІЇЄҐ]{2})/i);
+      if (fallbackMatch) {
+        carNumber = fallbackMatch[1].replace(/\s/g, '');
+      }
+    }
+
+    // Якщо все ще пусто в Green Card, шукаємо в секції 5
+    if (!carNumber && isGreenCard) {
+      const section5Match = fullText.match(/5\.\s*ДЕРЖАВНИЙ НОМЕРНИЙ ЗНАК[\s\S]{0,300}?6\.\s*КАТЕГОРІЯ/i);
+      if (section5Match) {
+        const fallback = section5Match[0].match(/\b([A-Z0-9]{4,10})\b/g);
+        if (fallback) {
+           const filtered = fallback.filter(w => !['ПРИ', 'НОМЕР', 'ЗНАК', 'АБО', 'ENGINE', 'CHASSIS', 'NONE', 'REGISTRATION'].includes(w) && !/^\d+$/.test(w));
+           if (filtered.length > 0) {
+              carNumber = filtered[0];
+           }
+        }
+      }
     }
 
     // 9. VIN номер
