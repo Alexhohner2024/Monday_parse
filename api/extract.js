@@ -17,10 +17,12 @@ export default async function handler(req, res) {
 
     // 0. Определение типа полиса
     const isGreenCard = /Зелена\s+картка|Green\s+Card|Carte\s+Internationale|КАРТКА МІЖНАРОДНОГО АВТОМОБІЛЬНОГО СТРАХУВАННЯ/i.test(fullText);
-    const insuranceType = isGreenCard ? 'Зелена картка' : 'Автоцивілка';
+    const isPovnyiAvtozakhyst = /ПОВНИЙ\s+АВТОЗАХИСТ/i.test(fullText);
+    const insuranceType = isPovnyiAvtozakhyst ? 'Повний Автозахист' : isGreenCard ? 'Зелена картка' : 'Автоцивілка';
 
     // 1. Номер полиса
     const policyMatch =
+      fullText.match(/Номер\s+договору\s+(FO-\d+)/i) ||  // Повний Автозахист: FO-03385574
       fullText.match(/UA[\/.]\d{3}[\/.]([\d]+)/) ||  // Green Card: UA/078/41812487 або UA048.41846155
       fullText.match(/Поліс\s*(?:№\s*)?UA\d{3}\.([\d]+)/) ||  // Green Card: Поліс UA048.41846155
       fullText.match(/Поліс\s*№\s*(\d{9})/) ||
@@ -88,6 +90,12 @@ export default async function handler(req, res) {
       if (gcPriceMatch) {
         price = gcPriceMatch[1].replace(/\s/g, '');
       }
+    }
+
+    // Повний Автозахист: рядок "«Автоцивілка плюс»50 000,00200,00" — перше число страхова сума, друге — премія
+    if (!price && isPovnyiAvtozakhyst) {
+      const foPriceMatch = fullText.match(/Автоцивілка\s+плюс[^0-9]*[\d\s]+,00(\d+),00/i);
+      if (foPriceMatch) price = foPriceMatch[1];
     }
 
     // 4. ФИО страхувальника
@@ -170,6 +178,14 @@ export default async function handler(req, res) {
       if (gcCardNameMatch) {
         insuredName = gcCardNameMatch[1].trim();
       }
+    }
+
+    // Повний Автозахист: ім'я стоїть рядком перед "Підписано за допомогою" у форматі "ДУДНІК О. А."
+    if (!insuredName && isPovnyiAvtozakhyst) {
+      const foNameMatch = fullText.match(
+        /([А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]\.\s*[А-ЯЁІЇЄҐЬ]\.)\s*\n?Підписано за допомогою/
+      );
+      if (foNameMatch) insuredName = foNameMatch[1].trim();
     }
 
     // 5. Дата початку
@@ -476,6 +492,15 @@ export default async function handler(req, res) {
           phoneDigits = `3${phoneDigits}`;
         }
         phone = /^380\d{9}$/.test(phoneDigits) ? phoneDigits : null;
+      }
+    }
+
+    // Повний Автозахист: телефон у секції підпису "+380 67-266-85-99" — можуть бути пробіли/дефіси
+    if (!phone && isPovnyiAvtozakhyst) {
+      const foPhoneMatch = fullText.match(/Підписано за допомогою[\s\S]*?(\+?380[\d\s\-\(\)]{9,15})/);
+      if (foPhoneMatch) {
+        const digits = foPhoneMatch[1].replace(/\D/g, '');
+        if (/^380\d{9}$/.test(digits)) phone = digits;
       }
     }
 
