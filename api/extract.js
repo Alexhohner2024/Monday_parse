@@ -18,10 +18,15 @@ export default async function handler(req, res) {
     // 0. Определение типа полиса
     const isGreenCard = /Зелена\s+картка|Green\s+Card|Carte\s+Internationale|КАРТКА МІЖНАРОДНОГО АВТОМОБІЛЬНОГО СТРАХУВАННЯ/i.test(fullText);
     const isPovnyiAvtozakhyst = /ПОВНИЙ\s+АВТОЗАХИСТ/i.test(fullText);
-    const insuranceType = isPovnyiAvtozakhyst ? 'Повний Автозахист' : isGreenCard ? 'Зелена картка' : 'Автоцивілка';
+    const isTravel = /МІЖНАРОДНИЙ ДОГОВІР КОМПЛЕКСНОГО СТРАХУВАННЯ/i.test(fullText);
+    const insuranceType = isPovnyiAvtozakhyst ? 'Повний Автозахист'
+      : isGreenCard ? 'Зелена картка'
+      : isTravel ? 'Travel'
+      : 'Автоцивілка';
 
     // 1. Номер полиса
     const policyMatch =
+      fullText.match(/No\s+(\d{6}-\d{4}-\d+)\s+від/i) ||  // Travel: 611933-4421-1000090
       fullText.match(/Номер\s+договору\s+(FO-\d+)/i) ||  // Повний Автозахист: FO-03385574
       fullText.match(/UA[\/.]\d{3}[\/.]([\d]+)/) ||  // Green Card: UA/078/41812487 або UA048.41846155
       fullText.match(/Поліс\s*(?:№\s*)?UA\d{3}\.([\d]+)/) ||  // Green Card: Поліс UA048.41846155
@@ -96,6 +101,12 @@ export default async function handler(req, res) {
     if (!price && isPovnyiAvtozakhyst) {
       const foPriceMatch = fullText.match(/Автоцивілка\s+плюс[^0-9]*[\d\s]+,00(\d+),00/i);
       if (foPriceMatch) price = foPriceMatch[1];
+    }
+
+    // Travel: поле 13 "Загальний страховий  платіж,  грн./ ... 525,60" (можуть бути подвійні пробіли)
+    if (!price && isTravel) {
+      const travelPriceMatch = fullText.match(/Загальний страховий\s+платіж[^0-9]*(\d+)[,.]\d{2}/i);
+      if (travelPriceMatch) price = travelPriceMatch[1];
     }
 
     // 4. ФИО страхувальника
@@ -186,6 +197,13 @@ export default async function handler(req, res) {
         /([А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]\.\s*[А-ЯЁІЇЄҐЬ]\.)\s*\n?Підписано за допомогою/
       );
       if (foNameMatch) insuredName = foNameMatch[1].trim();
+    }
+
+    // Travel: таблиця "П.І.Б. / Name,  first\nname\nKARAINAKI OLENA Дата народження/"
+    // Ім'я — лише латинські великі літери, закінчується перед кириличним словом або переносом
+    if (!insuredName && isTravel) {
+      const travelNameMatch = fullText.match(/П\.І\.Б\.[^\n]*\n[^\n]*\n([A-Z][A-Z\s]+?)(?=\s+[А-ЯІЇЄҐ]|\n)/i);
+      if (travelNameMatch) insuredName = travelNameMatch[1].trim();
     }
 
     // 5. Дата початку
@@ -500,6 +518,15 @@ export default async function handler(req, res) {
       const foPhoneMatch = fullText.match(/Підписано за допомогою[\s\S]*?(\+?380[\d\s\-\(\)]{9,15})/);
       if (foPhoneMatch) {
         const digits = foPhoneMatch[1].replace(/\D/g, '');
+        if (/^380\d{9}$/.test(digits)) phone = digits;
+      }
+    }
+
+    // Travel: "Тел.: +380 96-447-98-87"
+    if (!phone && isTravel) {
+      const travelPhoneMatch = fullText.match(/Тел\.:\s*(\+?380[\d\s\-\(\)]{9,15})/i);
+      if (travelPhoneMatch) {
+        const digits = travelPhoneMatch[1].replace(/\D/g, '');
         if (/^380\d{9}$/.test(digits)) phone = digits;
       }
     }
