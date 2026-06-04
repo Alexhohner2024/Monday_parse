@@ -191,6 +191,12 @@ export default async function handler(req, res) {
       }
     }
 
+    // Green Card fallback: формат Княжа "3СТРАХУВАЛЬНИК\nKARAINAKI OLEKSANDR\nРНОКПП:"
+    if (!insuredName && isGreenCard) {
+      const gcKniazhaMatch = fullText.match(/\d+\s*СТРАХУВАЛЬНИК\s*\n([A-Z][A-Z\s]+?)(?=\n)/i);
+      if (gcKniazhaMatch) insuredName = gcKniazhaMatch[1].trim();
+    }
+
     // Повний Автозахист: ім'я стоїть рядком перед "Підписано за допомогою" у форматі "ДУДНІК О. А."
     if (!insuredName && isPovnyiAvtozakhyst) {
       const foNameMatch = fullText.match(
