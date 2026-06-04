@@ -375,6 +375,15 @@ export default async function handler(req, res) {
       }
     }
 
+    // Формат 2b: "9.2.  Марка  \nVolkswagen Touran \n9.3.   Модель \n9.4." — бренд+модель одним рядком після заголовку
+    if (!carModel) {
+      const markaNextLine = fullText.match(/9\.2\.\s*Марка[^\n]*\n([^\n]+)/i);
+      if (markaNextLine) {
+        const val = markaNextLine[1].trim();
+        if (val && !/^9\.\d/.test(val)) carModel = val;
+      }
+    }
+
     // Формат 3: Старые форматы "Марка, модель"
     if (!carModel) {
       const carModelMatch =
