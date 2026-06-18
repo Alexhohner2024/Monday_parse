@@ -30,6 +30,7 @@ export default async function handler(req, res) {
       fullText.match(/Номер\s+договору\s+(FO-\d+)/i) ||  // Повний Автозахист: FO-03385574
       fullText.match(/UA[\/.]\d{3}[\/.]([\d]+)/) ||  // Green Card: UA/078/41812487 або UA048.41846155
       fullText.match(/Поліс\s*(?:№\s*)?UA\d{3}\.([\d]+)/) ||  // Green Card: Поліс UA048.41846155
+      fullText.match(/Поліс\s*No\s*(\d{9})/) ||  // Новий формат ТАС: "Поліс No230305984"
       fullText.match(/Поліс\s*№\s*(\d{9})/) ||
       fullText.match(/Акцепт\)\s*№\s*\d{6}-\d{4}-(\d{9})/) ||  // Новий формат: Акцепт) № 611933-2212-224712543
       fullText.match(/№\s*(\d{9})/) ||
@@ -169,6 +170,14 @@ export default async function handler(req, res) {
         // Смешанный регистр (разрешает любые комбинации заглавных/строчных)
         fullText.match(/Страхувальник\s+([А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+)/);
       insuredName = oldNameMatch ? oldNameMatch[1].trim() : null;
+    }
+
+    // Новий формат ТАС (2025+): "СТРАХУВАЛЬНИК\nПрізвище, ім'я, по батькові.../ Найменування\nНІВНЯ МИХАЙЛО МИХАЙЛОВИЧ"
+    if (!insuredName) {
+      const tasNameMatch = fullText.match(
+        /Страхувальник[\s\S]{0,300}?Найменування\s*\n\s*([А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+)/i
+      );
+      if (tasNameMatch) insuredName = tasNameMatch[1].trim();
     }
 
     // Green Card: ФІО латиницею в секції 3 СТРАХУВАЛЬНИК
@@ -384,6 +393,19 @@ export default async function handler(req, res) {
       }
     }
 
+    // Формат 2c: "9.2. Марка ВАЗ\n9.3. Модель21091" (без пробілу після Модель, новий формат ТАС 2025+)
+    if (!carModel) {
+      const markaMatch2c = fullText.match(/9\.2\.\s*Марка\s*([^\n]+?)(?=\s*9\.\d)/i);
+      const modelMatch2c = fullText.match(/9\.3\.\s*Модель\s*([^\n]+?)(?=\s*9\.\d)/i);
+      if (markaMatch2c && modelMatch2c) {
+        const markaVal = markaMatch2c[1].trim();
+        const modelVal = modelMatch2c[1].trim();
+        if (markaVal && modelVal && !/^9\.\d/.test(markaVal) && !/^9\.\d/.test(modelVal)) {
+          carModel = `${markaVal} ${modelVal}`;
+        }
+      }
+    }
+
     // Формат 3: Старые форматы "Марка, модель"
     if (!carModel) {
       const carModelMatch =
@@ -445,6 +467,14 @@ export default async function handler(req, res) {
       (carNumberMatch5 && carNumberMatch5[1]) ||
       (carNumberMatch6 && carNumberMatch6[1]) ||
       null;
+    }
+
+    // Новий формат ТАС (2025+): "9.4. Реєстраційний номер44770ОК" (без пробілу, секція 9.4 замість 4.2)
+    if (!carNumber) {
+      const section94Match = fullText.match(
+        /9\.4\.\s*Реєстраційний номер\s*([А-ЯІЇЄҐA-Z]{2}\d{4,5}[А-ЯІЇЄҐA-Z]{2}|\d{4,5}[А-ЯІЇЄҐA-Z]{2})/i
+      );
+      if (section94Match) carNumber = section94Match[1].toUpperCase();
     }
 
     // Green Card / General fallback: пошук простого номеру в тексті
