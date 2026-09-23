@@ -38,6 +38,21 @@ export default async function handler(req, res) {
       fullText.match(/(\d{9})/);
     const policyNumber = policyMatch ? policyMatch[1] : null;
 
+    // 1б. Номер родительского полиса ОСЦПВ (для Повний Автозахист)
+    let parentPolicyNumber = null;
+    if (isPovnyiAvtozakhyst) {
+      const parentMatch = fullText.match(/Поліс\s+ОСЦПВ[:\s]*серія\s*([A-Z]{2})\s*номер\s*(\d+)/i) ||
+                          fullText.match(/Поліс\s+ОСЦПВ[:\s]*([A-Z]{2})[\s\-]*(\d+)/i) ||
+                          fullText.match(/Поліс\s+ОСЦПВ[:\s]*([A-Z]{2}\-?\d+)/i);
+      if (parentMatch) {
+        if (parentMatch[2]) {
+          parentPolicyNumber = `${parentMatch[1]}-${parentMatch[2]}`;
+        } else if (parentMatch[1].includes('-') || parentMatch[1].match(/[A-Z]{2}\d+/)) {
+          parentPolicyNumber = parentMatch[1];
+        }
+      }
+    }
+
     // 2. ИПН
     const ipnMatch =
       fullText.match(/РНОКПП[^\d]*(\d{10})/) ||
@@ -213,12 +228,19 @@ export default async function handler(req, res) {
       if (gcKniazhaMatch) insuredName = gcKniazhaMatch[1].trim();
     }
 
-    // Повний Автозахист: ім'я стоїть рядком перед "Підписано за допомогою" у форматі "ДУДНІК О. А."
+    // Повний Автозахист: ім'я стоїть перед "Підписано за допомогою" — формат "ПРІЗВИЩЕ ІМ'Я ПО БАТЬКОВІ"
     if (!insuredName && isPovnyiAvtozakhyst) {
       const foNameMatch = fullText.match(
-        /([А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]\.\s*[А-ЯЁІЇЄҐЬ]\.)\s*\n?Підписано за допомогою/
+        /([А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]+)\s*\n?Підписано за допомогою/i
       );
-      if (foNameMatch) insuredName = foNameMatch[1].trim();
+      if (foNameMatch) {
+        insuredName = foNameMatch[1].trim();
+      } else {
+        const foNameMatch2 = fullText.match(
+          /([А-ЯЁІЇЄҐЬ]+\s+[А-ЯЁІЇЄҐЬ]\.\s*[А-ЯЁІЇЄҐЬ]\.)\s*\n?Підписано за допомогою/i
+        );
+        if (foNameMatch2) insuredName = foNameMatch2[1].trim();
+      }
     }
 
     // Travel: таблиця "П.І.Б. / Name,  first\nname\nKARAINAKI OLENA Дата народження/"
@@ -458,63 +480,66 @@ export default async function handler(req, res) {
     // 8. Государственный номер авто
     let carNumber = null;
 
-    // Новий формат: табличний (витягуємо з того ж match що і car_model)
-    if (tableMatch && tableMatch[2]) {
-      carNumber = tableMatch[2].trim();
-    }
-
-    // Інші формати якщо табличний не спрацював
-    if (!carNumber) {
-      const newCarNumberMatch = fullText.match(/4\.2\.\s*Реєстраційний номер\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/i);
-      const newCarNumberMatch2 = fullText.match(/4\.2\.\s*Реєстраційний номер\s+(\d{5}[А-ЯІЇЄҐA-Z]{2})/i);
-      const newCarNumberMatch3 = fullText.match(/4\.2\.\s*Реєстраційний номер\s+(\d{4}[А-ЯІЇЄҐA-Z]{2})/i);  // Формат: 0985ОЭ
-      const carNumberMatch1 = fullText.match(/Реєстраційний номер\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/);
-      const carNumberMatch2 = fullText.match(/Номерний знак\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/);
-      const carNumberMatch3 = fullText.match(/Номерний знак\s+(\d{5}[А-ЯІЇЄҐA-Z]{2})/);
-      const carNumberMatch4 = fullText.match(/Реєстраційний номер\s+(\d{5}[А-ЯІЇЄҐA-Z]{2})/);
-      const carNumberMatch5 = fullText.match(/Номерний знак\s+(\d{4}[А-ЯІЇЄҐA-Z]{2})/);  // Формат: 0985ОЭ
-      const carNumberMatch6 = fullText.match(/Реєстраційний номер\s+(\d{4}[А-ЯІЇЄҐA-Z]{2})/);  // Формат: 0985ОЭ
-
-    carNumber =
-        (newCarNumberMatch && newCarNumberMatch[1]) ||
-        (newCarNumberMatch2 && newCarNumberMatch2[1]) ||
-        (newCarNumberMatch3 && newCarNumberMatch3[1]) ||
-      (carNumberMatch1 && carNumberMatch1[1]) ||
-      (carNumberMatch2 && carNumberMatch2[1]) ||
-      (carNumberMatch3 && carNumberMatch3[1]) ||
-      (carNumberMatch4 && carNumberMatch4[1]) ||
-      (carNumberMatch5 && carNumberMatch5[1]) ||
-      (carNumberMatch6 && carNumberMatch6[1]) ||
-      null;
-    }
-
-    // Новий формат ТАС (2025+): "9.4. Реєстраційний номер44770ОК" (без пробілу, секція 9.4 замість 4.2)
-    if (!carNumber) {
-      const section94Match = fullText.match(
-        /9\.4\.\s*Реєстраційний номер\s*([А-ЯІЇЄҐA-Z]{2}\d{4,5}[А-ЯІЇЄҐA-Z]{2}|\d{4,5}[А-ЯІЇЄҐA-Z]{2})/i
-      );
-      if (section94Match) carNumber = section94Match[1].toUpperCase();
-    }
-
-    // Green Card / General fallback: пошук простого номеру в тексті
-    if (!carNumber) {
-      const fallbackMatch = fullText.match(/([A-ZА-ЯІЇЄҐ]{2}\s?\d{4}\s?[A-ZА-ЯІЇЄҐ]{2})/i) ||
-                            fullText.match(/(\d{4,5}\s?[A-ZА-ЯІЇЄҐ]{2})/i);
-      if (fallbackMatch) {
-        carNumber = fallbackMatch[1].replace(/\s/g, '');
+    // Для "Повний Автозахист" данные авто в родительском полисе ОСЦПВ — не парсим
+    if (!isPovnyiAvtozakhyst) {
+      // Новий формат: табличний (витягуємо з того ж match що і car_model)
+      if (tableMatch && tableMatch[2]) {
+        carNumber = tableMatch[2].trim();
       }
-    }
 
-    // Якщо все ще пусто в Green Card, шукаємо в секції 5
-    if (!carNumber && isGreenCard) {
-      const section5Match = fullText.match(/5\.\s*ДЕРЖАВНИЙ НОМЕРНИЙ ЗНАК[\s\S]{0,300}?6\.\s*КАТЕГОРІЯ/i);
-      if (section5Match) {
-        const fallback = section5Match[0].match(/\b([A-Z0-9]{4,10})\b/g);
-        if (fallback) {
-           const filtered = fallback.filter(w => !['ПРИ', 'НОМЕР', 'ЗНАК', 'АБО', 'ENGINE', 'CHASSIS', 'NONE', 'REGISTRATION'].includes(w) && !/^\d+$/.test(w));
-           if (filtered.length > 0) {
-              carNumber = filtered[0];
-           }
+      // Інші формати якщо табличний не спрацював
+      if (!carNumber) {
+        const newCarNumberMatch = fullText.match(/4\.2\.\s*Реєстраційний номер\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/i);
+        const newCarNumberMatch2 = fullText.match(/4\.2\.\s*Реєстраційний номер\s+(\d{5}[А-ЯІЇЄҐA-Z]{2})/i);
+        const newCarNumberMatch3 = fullText.match(/4\.2\.\s*Реєстраційний номер\s+(\d{4}[А-ЯІЇЄҐA-Z]{2})/i);
+        const carNumberMatch1 = fullText.match(/Реєстраційний номер\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/);
+        const carNumberMatch2 = fullText.match(/Номерний знак\s+([А-ЯІЇЄҐA-Z]{2}\d{4}[А-ЯІЇЄҐA-Z]{2})/);
+        const carNumberMatch3 = fullText.match(/Номерний знак\s+(\d{5}[А-ЯІЇЄҐA-Z]{2})/);
+        const carNumberMatch4 = fullText.match(/Реєстраційний номер\s+(\d{5}[А-ЯІЇЄҐA-Z]{2})/);
+        const carNumberMatch5 = fullText.match(/Номерний знак\s+(\d{4}[А-ЯІЇЄҐA-Z]{2})/);
+        const carNumberMatch6 = fullText.match(/Реєстраційний номер\s+(\d{4}[А-ЯІЇЄҐA-Z]{2})/);
+
+        carNumber =
+            (newCarNumberMatch && newCarNumberMatch[1]) ||
+            (newCarNumberMatch2 && newCarNumberMatch2[1]) ||
+            (newCarNumberMatch3 && newCarNumberMatch3[1]) ||
+          (carNumberMatch1 && carNumberMatch1[1]) ||
+          (carNumberMatch2 && carNumberMatch2[1]) ||
+          (carNumberMatch3 && carNumberMatch3[1]) ||
+          (carNumberMatch4 && carNumberMatch4[1]) ||
+          (carNumberMatch5 && carNumberMatch5[1]) ||
+          (carNumberMatch6 && carNumberMatch6[1]) ||
+          null;
+      }
+
+      // Новий формат ТАС (2025+): "9.4. Реєстраційний номер44770ОК"
+      if (!carNumber) {
+        const section94Match = fullText.match(
+          /9\.4\.\s*Реєстраційний номер\s*([А-ЯІЇЄҐA-Z]{2}\d{4,5}[А-ЯІЇЄҐA-Z]{2}|\d{4,5}[А-ЯІЇЄҐA-Z]{2})/i
+        );
+        if (section94Match) carNumber = section94Match[1].toUpperCase();
+      }
+
+      // Green Card / General fallback: пошук простого номеру в тексті
+      if (!carNumber) {
+        const fallbackMatch = fullText.match(/([A-ZА-ЯІЇЄҐ]{2}\s?\d{4}\s?[A-ZА-ЯІЇЄҐ]{2})/i) ||
+                              fullText.match(/(\d{4,5}\s?[A-ZА-ЯІЇЄҐ]{2})/i);
+        if (fallbackMatch) {
+          carNumber = fallbackMatch[1].replace(/\s/g, '');
+        }
+      }
+
+      // Якщо все ще пусто в Green Card, шукаємо в секції 5
+      if (!carNumber && isGreenCard) {
+        const section5Match = fullText.match(/5\.\s*ДЕРЖАВНИЙ НОМЕРНИЙ ЗНАК[\s\S]{0,300}?6\.\s*КАТЕГОРІЯ/i);
+        if (section5Match) {
+          const fallback = section5Match[0].match(/\b([A-Z0-9]{4,10})\b/g);
+          if (fallback) {
+             const filtered = fallback.filter(w => !['ПРИ', 'НОМЕР', 'ЗНАК', 'АБО', 'ENGINE', 'CHASSIS', 'NONE', 'REGISTRATION'].includes(w) && !/^\d+$/.test(w));
+             if (filtered.length > 0) {
+                carNumber = filtered[0];
+             }
+          }
         }
       }
     }
@@ -522,35 +547,32 @@ export default async function handler(req, res) {
     // 9. VIN номер
     let vinNumber = null;
 
-    // Новий формат: табличний (витягуємо з того ж match що і car_model)
-    if (tableMatch && tableMatch[3]) {
-      vinNumber = tableMatch[3].trim();
-    }
-
-    // Старий формат або якщо табличний не спрацював
-    if (!vinNumber) {
-      // Шукаємо VIN секцію і витягуємо номер (VIN може бути різної довжини: 11-17 символів)
-      // Патерн захоплює більше символів, щоб врахувати переноси строк
-      const vinSectionMatch = fullText.match(/VIN[^A-Z0-9]{0,100}([A-Z0-9\s\n\r]{6,30})/i);
-      if (vinSectionMatch) {
-        // Видаляємо всі пробіли та переноси, залишаємо тільки букви та цифри
-        const cleanedVin = vinSectionMatch[1].replace(/[\s\n\r]/g, '');
-        // VIN зазвичай від 11 до 17 символів, але може бути і коротше (старі авто, причепи)
-        // Беремо найдовший відрізок буквено-цифрових символів довжиною від 6 до 17
-        const vinMatch = cleanedVin.match(/^[A-Z0-9]{6,17}/);
-        if (vinMatch) {
-          vinNumber = vinMatch[0];
-        }
+    // Для "Повний Автозахист" VIN в родительском полисе
+    if (!isPovnyiAvtozakhyst) {
+      // Новий формат: табличний (витягуємо з того ж match що і car_model)
+      if (tableMatch && tableMatch[3]) {
+        vinNumber = tableMatch[3].trim();
       }
 
-      // Запасні варіанти для різних форматів
+      // Старий формат або якщо табличний не спрацював
       if (!vinNumber) {
-        const vinMatch =
-          fullText.match(/VIN[^\n]*([A-Z0-9]{11,17})/i) ||
-          fullText.match(/Номер кузова[^\n]*([A-Z0-9]{11,17})/i) ||
-          fullText.match(/VIN[:\s]*([A-Z0-9]{11,17})/i) ||
-          fullText.match(/([A-Z0-9]{17})/); // Стандартний 17-символьний VIN
-        vinNumber = vinMatch ? vinMatch[1] : null;
+        const vinSectionMatch = fullText.match(/VIN[^A-Z0-9]{0,100}([A-Z0-9\s\n\r]{6,30})/i);
+        if (vinSectionMatch) {
+          const cleanedVin = vinSectionMatch[1].replace(/[\s\n\r]/g, '');
+          const vinMatch = cleanedVin.match(/^[A-Z0-9]{6,17}/);
+          if (vinMatch) {
+            vinNumber = vinMatch[0];
+          }
+        }
+
+        if (!vinNumber) {
+          const vinMatch =
+            fullText.match(/VIN[^\n]*([A-Z0-9]{11,17})/i) ||
+            fullText.match(/Номер кузова[^\n]*([A-Z0-9]{11,17})/i) ||
+            fullText.match(/VIN[:\s]*([A-Z0-9]{11,17})/i) ||
+            fullText.match(/([A-Z0-9]{17})/);
+          vinNumber = vinMatch ? vinMatch[1] : null;
+        }
       }
     }
 
@@ -577,9 +599,10 @@ export default async function handler(req, res) {
       }
     }
 
-    // Повний Автозахист: телефон у секції підпису "+380 67-266-85-99" — можуть бути пробіли/дефіси
+    // Повний Автозахист: телефон у секції підпису — "відправленого на номер +380 96-381-14-18" або "+380 67-266-85-99"
     if (!phone && isPovnyiAvtozakhyst) {
-      const foPhoneMatch = fullText.match(/Підписано за допомогою[\s\S]*?(\+?380[\d\s\-\(\)]{9,15})/);
+      const foPhoneMatch = fullText.match(/відправленого на номер\s+(\+?380[\d\s\-\(\)]{9,15})/i) ||
+                           fullText.match(/Підписано за допомогою[\s\S]*?(\+?380[\d\s\-\(\)]{9,15})/);
       if (foPhoneMatch) {
         const digits = foPhoneMatch[1].replace(/\D/g, '');
         if (/^380\d{9}$/.test(digits)) phone = digits;
@@ -605,6 +628,7 @@ export default async function handler(req, res) {
         price: price,
         ipn: ipn,
         policy_number: policyNumber,
+        parent_policy_number: parentPolicyNumber,
         insured_name: insuredName,
         start_date: startDate,
         end_date: endDate,
