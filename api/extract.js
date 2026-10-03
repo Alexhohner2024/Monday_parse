@@ -1,4 +1,4 @@
-const pdf = require('pdf-parse');
+﻿const pdf = require('pdf-parse');
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -57,7 +57,9 @@ export default async function handler(req, res) {
     const ipnMatch =
       fullText.match(/РНОКПП[^\d]*(\d{10})/) ||
       fullText.match(/ЄДРПОУ[^\d]*(\d{10})/) ||
-      fullText.match(/ІНПП[:\s]*(\d{10})/);
+      fullText.match(/ІНПП[:\s]*(\d{10})/) ||
+      // Новый бланк ОСЦПВ: РНОКПП находится сразу после ФИО в секции страхователя
+      fullText.match(/СТРАХУВАЛЬНИК[\s\S]{0,500}?\b(\d{10})\b/i);
     const ipn = ipnMatch ? ipnMatch[1] : null;
 
     // 3. Цена
@@ -103,6 +105,14 @@ export default async function handler(req, res) {
       }
     }
 
+    // Новый бланк ОСЦПВ: цена отдельной строкой между разделами 15 и 16
+    if (!price) {
+      const newRcaPriceMatch = fullText.match(
+        /15\s+Розмір страхової премії[\s\S]{0,500}?\n\s*(\d[\d ]*)\s*\n\s*16\b/i
+      );
+      if (newRcaPriceMatch) price = newRcaPriceMatch[1].replace(/\s/g, '');
+    }
+
     // Green Card: шукаємо ціну після "Розмір страхової премії"
     if (!price && isGreenCard) {
       const premiumIdx = fullText.search(/розмір\s+страхової\s+премії/i);
@@ -135,11 +145,17 @@ export default async function handler(req, res) {
     // 4. ФИО страхувальника
     let insuredName = null;
 
+    // Новый бланк ОСЦПВ: "СТРАХУВАЛЬНИК 3" и ФИО с датой рождения в одной строке
+    const newRcaNameMatch = fullText.match(
+      /СТРАХУВАЛЬНИК\s*3\s*([А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+)\s*,\s*\d{2}\.\d{2}\.\d{4}/i
+    );
+    if (newRcaNameMatch) insuredName = newRcaNameMatch[1].trim();
+
     // Формат: "3\nСТРАХУВАЛЬНИК\nДУДНІК ОЛЕКСІЙ АНДРЙОВИЧ" (цифра без точки, заглавными)
     // Або "3\nСТРАХУВАЛЬНИК\nНівня Віталій Олексійович" (цифра без точки, змішаний регістр)
     // Більш гнучкий варіант: працює і в початку тексту, і в середині
     const formatWithNumberMatch = fullText.match(/(?:^|\n)(\d+)\s*(?:\n|\.\s*)\s*СТРАХУВАЛЬНИК\s*(?:\n|[\s\S]{0,50}?\n)\s*([А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+\s+[А-ЯЁІЇЄҐЬ][А-ЯЁІЇЄҐЬа-яёіїєґь]+)/i);
-    if (formatWithNumberMatch) {
+    if (!insuredName && formatWithNumberMatch) {
       insuredName = formatWithNumberMatch[2].trim();
     }
 
@@ -339,6 +355,12 @@ export default async function handler(req, res) {
       const month = monthMap[startDateMatch3[3]];
       const year = startDateMatch3[4];
       startDate = `${day}.${month}.${year}, ${startDateMatch3[1]}`;
+    }
+
+    // Новый бланк ОСЦПВ и Green Card: "ДоговорузDD.MM.YYYY" или с пробелом
+    if (!startDate) {
+      const compactStartMatch = fullText.match(/Договоруз[ \t\n]*(\d{2}\.\d{2}\.\d{4})/i);
+      if (compactStartMatch) startDate = `${compactStartMatch[1]}, 00:00`;
     }
 
     // Green Card: "ДоговорузDD.MM.YYYY" або "Договоруз DD.MM.YYYY" або "Договору з DD.MM.YYYY"
@@ -610,6 +632,17 @@ export default async function handler(req, res) {
     }
 
     // Travel: "Тел.: +380 96-447-98-87"
+    // Новый бланк ОСЦПВ: телефон указан без подписи в секции страхователя
+    if (!phone) {
+      const insuredPhoneMatch = fullText.match(
+        /СТРАХУВАЛЬНИК[\s\S]{0,500}?\+?(380[\d\s\-\(\)]{9,15})/i
+      );
+      if (insuredPhoneMatch) {
+        const digits = insuredPhoneMatch[1].replace(/\D/g, '');
+        if (/^380\d{9}$/.test(digits)) phone = digits;
+      }
+    }
+
     if (!phone && isTravel) {
       const travelPhoneMatch = fullText.match(/Тел\.:\s*(\+?380[\d\s\-\(\)]{9,15})/i);
       if (travelPhoneMatch) {
@@ -646,3 +679,4 @@ export default async function handler(req, res) {
     });
   }
 }
+
